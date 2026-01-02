@@ -1,7 +1,6 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js'
-import { supabase } from '../lib/supabase'
-import { createWhalesEmbed, createErrorEmbed } from '../lib/embeds'
-import type { WhaleResult } from '../lib/types'
+import { createEnhancedWhalesEmbed, createErrorEmbed } from '../lib/embeds'
+import { getEnhancedWhaleData } from '../lib/metrics'
 
 export const data = new SlashCommandBuilder()
   .setName('whales')
@@ -26,60 +25,26 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   const ticker = interaction.options.getString('ticker', true).toUpperCase()
   const limit = interaction.options.getInteger('limit') || 15
 
-  const { data: latestDate } = await supabase
-    .from('holdings_13f')
-    .select('report_date')
-    .eq('ticker', ticker)
-    .order('report_date', { ascending: false })
-    .limit(1)
-    .single()
+  try {
+    const { whales, activity } = await getEnhancedWhaleData(ticker, limit)
 
-  if (!latestDate) {
-    await interaction.editReply({
-      embeds: [
-        createErrorEmbed(
-          `No 13F holdings found for **${ticker}**. This could mean:\n• The ticker is not held by any 13F filers\n• The ticker symbol may be incorrect\n• 13F data hasn't been loaded yet`
-        ),
-      ],
-    })
-    return
-  }
+    if (whales.length === 0) {
+      await interaction.editReply({
+        embeds: [
+          createErrorEmbed(
+            `No 13F holdings found for **${ticker}**. This could mean:\n• The ticker is not held by any 13F filers\n• The ticker symbol may be incorrect\n• 13F data hasn't been loaded yet`
+          ),
+        ],
+      })
+      return
+    }
 
-  const { data, error } = await supabase
-    .from('holdings_13f')
-    .select('fund_name, fund_cik, shares, value_usd, report_date')
-    .eq('ticker', ticker)
-    .eq('report_date', latestDate.report_date)
-    .order('value_usd', { ascending: false })
-    .limit(limit)
-
-  if (error) {
+    const embed = createEnhancedWhalesEmbed(ticker, whales, activity)
+    await interaction.editReply({ embeds: [embed] })
+  } catch (error) {
+    console.error('Error fetching whale data:', error)
     await interaction.editReply({
       embeds: [createErrorEmbed('Failed to fetch holdings. Please try again.')],
     })
-    return
   }
-
-  const whales: WhaleResult[] = (data || []).map((h) => ({
-    fundName: h.fund_name,
-    fundCik: h.fund_cik,
-    shares: h.shares,
-    valueUsd: h.value_usd,
-    reportDate: h.report_date,
-  }))
-
-  const embed = createWhalesEmbed(ticker, whales)
-
-  if (whales.length > 0) {
-    embed.addFields({
-      name: 'Data As Of',
-      value: new Date(latestDate.report_date).toLocaleDateString('en-US', {
-        month: 'long',
-        day: 'numeric',
-        year: 'numeric',
-      }),
-    })
-  }
-
-  await interaction.editReply({ embeds: [embed] })
 }

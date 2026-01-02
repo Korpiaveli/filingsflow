@@ -687,6 +687,75 @@ export const poll13FFilings = inngest.createFunction(
   }
 )
 
+export const fetchTickerNews = inngest.createFunction(
+  {
+    id: 'fetch-ticker-news',
+    name: 'Fetch News for Active Tickers',
+    retries: 2,
+  },
+  { cron: '*/15 6-20 * * 1-5' },
+  async ({ step }) => {
+    const { fetchNewsForTickers } = await import('@/lib/news')
+
+    const activeTickers = await step.run('get-active-tickers', async () => {
+      const supabase = await createServiceClient()
+
+      const oneDayAgo = new Date()
+      oneDayAgo.setDate(oneDayAgo.getDate() - 1)
+
+      const { data: recentTransactions } = await supabase
+        .from('insider_transactions')
+        .select('ticker')
+        .gte('created_at', oneDayAgo.toISOString())
+        .not('ticker', 'is', null)
+
+      const { data: watchlistTickers } = await supabase
+        .from('watchlists')
+        .select('ticker')
+        .limit(50)
+
+      const tickers = new Set<string>()
+
+      recentTransactions?.forEach(t => {
+        if (t.ticker) tickers.add(t.ticker.toUpperCase())
+      })
+
+      watchlistTickers?.forEach(w => {
+        if (w.ticker) tickers.add(w.ticker.toUpperCase())
+      })
+
+      return Array.from(tickers).slice(0, 30)
+    })
+
+    if (activeTickers.length === 0) {
+      return { fetched: 0 }
+    }
+
+    await step.run('fetch-news-batch', async () => {
+      await fetchNewsForTickers(activeTickers)
+    })
+
+    return { fetched: activeTickers.length }
+  }
+)
+
+export const cleanupEnrichmentCache = inngest.createFunction(
+  {
+    id: 'cleanup-enrichment-cache',
+    name: 'Cleanup Enrichment Cache',
+  },
+  { cron: '0 2 * * *' },
+  async ({ step }) => {
+    const { cleanupExpiredCache } = await import('@/lib/news')
+
+    const deleted = await step.run('cleanup-news-cache', async () => {
+      return cleanupExpiredCache()
+    })
+
+    return { deleted }
+  }
+)
+
 export const functions = [
   pollSECFilings,
   manualPollFilings,
@@ -694,4 +763,6 @@ export const functions = [
   sendWatchlistNotifications,
   sendDailyDigest,
   poll13FFilings,
+  fetchTickerNews,
+  cleanupEnrichmentCache,
 ]
