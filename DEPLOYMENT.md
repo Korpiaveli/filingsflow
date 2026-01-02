@@ -20,6 +20,7 @@ supabase/migrations/001_initial_schema.sql
 supabase/migrations/002_cusip_cache.sql
 supabase/migrations/003_rate_limits.sql
 supabase/migrations/004_server_watchlists.sql
+supabase/migrations/005_enrichment_cache.sql
 ```
 
 ### Enable Discord OAuth
