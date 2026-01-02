@@ -12,6 +12,7 @@ import type {
 } from './types'
 
 const DISCLAIMER = 'Not investment advice. Data from SEC EDGAR.'
+const CLUSTER_COLOR = 0xFFA500
 
 export function createFilingEmbed(filing: FilingResult): EmbedBuilder {
   const embed = new EmbedBuilder()
@@ -96,6 +97,9 @@ export function createEnhancedTransactionEmbed(
   const action = getTransactionAction(txn.transactionType)
   const typeDetail = getTransactionTypeDetail(txn.transactionType)
 
+  const isTop1Percent = metrics?.percentileRank != null && metrics.percentileRank <= 0.01
+  const fireIndicator = isTop1Percent ? '🔥 ' : ''
+
   const roleLabel = txn.insiderTitle || (metrics?.isOfficer ? 'Officer' : metrics?.isDirector ? 'Director' : 'Insider')
   const recencyText = metrics?.daysSinceLastTrade != null
     ? ` | ${formatRecency(metrics.daysSinceLastTrade)}`
@@ -103,7 +107,7 @@ export function createEnhancedTransactionEmbed(
 
   const embed = new EmbedBuilder()
     .setColor(color)
-    .setTitle(`${txn.ticker} - ${typeDetail}`)
+    .setTitle(`${fireIndicator}${txn.ticker} - ${typeDetail}`)
     .setDescription(`**${txn.insiderName}** (${roleLabel})${recencyText}`)
 
   const txnDetails: string[] = []
@@ -156,7 +160,7 @@ export function createEnhancedTransactionEmbed(
       `• "${truncate(n.title, 45)}" (${formatTimeAgo(n.publishedAt)})`
     )
     embed.addFields({
-      name: 'Recent News',
+      name: '📰 Recent News',
       value: newsItems.join('\n'),
       inline: false,
     })
@@ -177,11 +181,10 @@ export function createClusterEmbed(
   transactionType: 'buy' | 'sell'
 ): EmbedBuilder {
   const isBuy = transactionType === 'buy'
-  const color = isBuy ? Colors.Green : Colors.Red
   const action = isBuy ? 'bought' : 'sold'
 
   const embed = new EmbedBuilder()
-    .setColor(color)
+    .setColor(CLUSTER_COLOR)
     .setTitle(`${ticker} - Insider Cluster Detected`)
     .setDescription(`**${cluster.insiderCount} insiders ${action}** within ${cluster.timeframeDays} days`)
 
@@ -432,7 +435,7 @@ function buildInsights(
   }
 
   if (metrics.is10b51Plan) {
-    insights.push('Pre-planned 10b5-1 trade')
+    insights.push('📋 Pre-planned 10b5-1 trade')
   } else {
     insights.push('Discretionary trade (not pre-planned)')
   }
