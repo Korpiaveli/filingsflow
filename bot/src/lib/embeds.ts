@@ -99,6 +99,8 @@ export function createEnhancedTransactionEmbed(
 
   const isTop1Percent = metrics?.percentileRank != null && metrics.percentileRank <= 0.01
   const fireIndicator = isTop1Percent ? '🔥 ' : ''
+  const watchlistIndicator = txn.isOnWatchlist ? '⭐ ' : ''
+  const amendmentIndicator = txn.isAmendment ? ' [AMENDED]' : ''
 
   const roleLabel = txn.insiderTitle || (metrics?.isOfficer ? 'Officer' : metrics?.isDirector ? 'Director' : 'Insider')
   const recencyText = metrics?.daysSinceLastTrade != null
@@ -107,8 +109,12 @@ export function createEnhancedTransactionEmbed(
 
   const embed = new EmbedBuilder()
     .setColor(color)
-    .setTitle(`${fireIndicator}${txn.ticker} - ${typeDetail}`)
+    .setTitle(`${watchlistIndicator}${fireIndicator}${txn.ticker} - ${typeDetail}${amendmentIndicator}`)
     .setDescription(`**${txn.insiderName}** (${roleLabel})${recencyText}`)
+
+  if (txn.filingUrl) {
+    embed.setURL(txn.filingUrl)
+  }
 
   const txnDetails: string[] = []
   if (txn.shares) txnDetails.push(`Shares: ${formatNumber(txn.shares)}`)

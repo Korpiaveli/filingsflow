@@ -55,7 +55,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   let query = supabase
     .from('insider_transactions')
     .select(
-      'id, ticker, company_name, insider_name, insider_title, insider_cik, transaction_type, transaction_date, shares, price_per_share, total_value, is_officer, is_director, is_10b51_plan, shares_owned_after, direct_or_indirect'
+      'id, ticker, company_name, insider_name, insider_title, insider_cik, transaction_type, transaction_date, shares, price_per_share, total_value, is_officer, is_director, is_10b51_plan, shares_owned_after, direct_or_indirect, filings(file_url, form_type)'
     )
     .order('transaction_date', { ascending: false })
     .limit(count)
@@ -92,24 +92,43 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     return
   }
 
-  const transactions: EnhancedTransactionResult[] = data.map((t) => ({
-    id: t.id,
-    ticker: t.ticker,
-    companyName: t.company_name,
-    insiderName: t.insider_name,
-    insiderTitle: t.insider_title,
-    insiderCik: t.insider_cik,
-    transactionType: t.transaction_type,
-    transactionDate: t.transaction_date,
-    shares: t.shares,
-    pricePerShare: t.price_per_share,
-    totalValue: t.total_value,
-    isOfficer: t.is_officer,
-    isDirector: t.is_director,
-    is10b51Plan: t.is_10b51_plan,
-    sharesOwnedAfter: t.shares_owned_after,
-    directOrIndirect: t.direct_or_indirect as 'D' | 'I' | null,
-  }))
+  let watchlistTickers: Set<string> = new Set()
+  if (interaction.guildId) {
+    const { data: watchlistData } = await supabase
+      .from('server_watchlists')
+      .select('ticker')
+      .eq('guild_id', interaction.guildId)
+
+    if (watchlistData) {
+      watchlistTickers = new Set(watchlistData.map(w => w.ticker.toUpperCase()))
+    }
+  }
+
+  const transactions: EnhancedTransactionResult[] = data.map((t) => {
+    const filingData = t.filings as { file_url: string | null; form_type: string } | { file_url: string | null; form_type: string }[] | null
+    const filing = Array.isArray(filingData) ? filingData[0] : filingData
+    return {
+      id: t.id,
+      ticker: t.ticker,
+      companyName: t.company_name,
+      insiderName: t.insider_name,
+      insiderTitle: t.insider_title,
+      insiderCik: t.insider_cik,
+      transactionType: t.transaction_type,
+      transactionDate: t.transaction_date,
+      shares: t.shares,
+      pricePerShare: t.price_per_share,
+      totalValue: t.total_value,
+      isOfficer: t.is_officer,
+      isDirector: t.is_director,
+      is10b51Plan: t.is_10b51_plan,
+      sharesOwnedAfter: t.shares_owned_after,
+      directOrIndirect: t.direct_or_indirect as 'D' | 'I' | null,
+      filingUrl: filing?.file_url ?? null,
+      isAmendment: filing?.form_type?.includes('/A') ?? false,
+      isOnWatchlist: watchlistTickers.has(t.ticker.toUpperCase()),
+    }
+  })
 
   let embeds
 

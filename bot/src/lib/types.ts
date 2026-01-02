@@ -102,6 +102,9 @@ export interface EnhancedTransactionResult extends TransactionResult {
   is10b51Plan?: boolean
   sharesOwnedAfter?: number | null
   directOrIndirect?: 'D' | 'I' | null
+  filingUrl?: string | null
+  isAmendment?: boolean
+  isOnWatchlist?: boolean
 }
 
 export interface QuarterlyActivity {
