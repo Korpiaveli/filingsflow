@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import type { TransactionMetrics, ClusterInfo, EnhancedTransactionResult, QuarterlyActivity } from './types'
+import type { TransactionMetrics, ClusterInfo, EnhancedTransactionResult, QuarterlyActivity, NewsContext, NewsItem } from './types'
 
 const CLUSTER_DAYS = 7
 const PERCENTILE_DAYS = 30
@@ -122,7 +122,7 @@ async function getClusterInfo(
 
   const { data, error } = await supabase
     .from('insider_transactions')
-    .select('insider_cik, insider_name, insider_title, total_value')
+    .select('insider_cik, insider_name, insider_title, total_value, is_10b51_plan')
     .eq('ticker', ticker)
     .in('transaction_type', types)
     .gte('transaction_date', cutoffDate.toISOString().split('T')[0])
@@ -131,11 +131,17 @@ async function getClusterInfo(
   if (error || !data || data.length === 0) return null
 
   const uniqueInsiders = new Map<string, { name: string; title: string | null; value: number }>()
+  let discretionaryCount = 0
+  const totalTransactions = data.length
 
   for (const txn of data) {
     const cik = txn.insider_cik as string
     const existing = uniqueInsiders.get(cik)
     const value = Math.abs(txn.total_value as number)
+
+    if (!txn.is_10b51_plan) {
+      discretionaryCount++
+    }
 
     if (existing) {
       existing.value += value
@@ -161,6 +167,8 @@ async function getClusterInfo(
     totalValue,
     timeframeDays: CLUSTER_DAYS,
     participants,
+    discretionaryCount,
+    totalTransactions,
   }
 }
 
@@ -261,6 +269,7 @@ export async function getEnhancedWhaleData(
     isNew: boolean
   }>
   activity: QuarterlyActivity | null
+  concentration: { top10Percent: number; totalInstitutionalShares: number } | null
 }> {
   const { data: latest, error: latestError } = await supabase
     .from('holdings_13f')
@@ -271,14 +280,14 @@ export async function getEnhancedWhaleData(
     .single()
 
   if (latestError || !latest) {
-    return { whales: [], activity: null }
+    return { whales: [], activity: null, concentration: null }
   }
 
   const currentQuarter = latest.report_date
   const prevQuarterDate = new Date(currentQuarter)
   prevQuarterDate.setMonth(prevQuarterDate.getMonth() - 3)
 
-  const [currentData, prevData, activity] = await Promise.all([
+  const [currentData, prevData, activity, allSharesData] = await Promise.all([
     supabase
       .from('holdings_13f')
       .select('fund_name, fund_cik, shares, value_usd, report_date')
@@ -293,10 +302,15 @@ export async function getEnhancedWhaleData(
       .gte('report_date', prevQuarterDate.toISOString().split('T')[0])
       .lt('report_date', currentQuarter),
     getQuarterlyActivity(ticker),
+    supabase
+      .from('holdings_13f')
+      .select('shares')
+      .eq('ticker', ticker)
+      .eq('report_date', currentQuarter),
   ])
 
   if (currentData.error) {
-    return { whales: [], activity: null }
+    return { whales: [], activity: null, concentration: null }
   }
 
   const prevFunds = new Map(
@@ -326,7 +340,21 @@ export async function getEnhancedWhaleData(
     }
   })
 
-  return { whales, activity }
+  let concentration: { top10Percent: number; totalInstitutionalShares: number } | null = null
+
+  if (allSharesData.data && allSharesData.data.length > 0) {
+    const totalInstitutionalShares = allSharesData.data.reduce((sum, h) => sum + h.shares, 0)
+    const top10Shares = whales.slice(0, 10).reduce((sum, w) => sum + w.shares, 0)
+
+    if (totalInstitutionalShares > 0) {
+      concentration = {
+        top10Percent: (top10Shares / totalInstitutionalShares) * 100,
+        totalInstitutionalShares,
+      }
+    }
+  }
+
+  return { whales, activity, concentration }
 }
 
 export function formatMetricsInsights(metrics: TransactionMetrics): string[] {
@@ -376,4 +404,116 @@ export function formatRecency(days: number | null): string {
   if (days < 30) return `${Math.floor(days / 7)} weeks ago`
   if (days < 365) return `${Math.floor(days / 30)} months ago`
   return `${Math.floor(days / 365)} years ago`
+}
+
+export async function getNewsContext(ticker: string): Promise<NewsContext> {
+  const cacheThreshold = new Date()
+  cacheThreshold.setHours(cacheThreshold.getHours() - 24)
+
+  const [newsResult, filingResult] = await Promise.all([
+    supabase
+      .from('news_cache')
+      .select('source, title, url, published_at, snippet')
+      .eq('ticker', ticker.toUpperCase())
+      .gte('fetched_at', cacheThreshold.toISOString())
+      .order('published_at', { ascending: false })
+      .limit(5),
+    supabase
+      .from('filings')
+      .select('id')
+      .eq('ticker', ticker.toUpperCase())
+      .eq('form_type', '8-K')
+      .gte('filed_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
+      .limit(1),
+  ])
+
+  const newsItems: NewsItem[] = (newsResult.data || []).map(row => ({
+    source: row.source as NewsItem['source'],
+    title: row.title,
+    url: row.url,
+    publishedAt: new Date(row.published_at),
+    snippet: row.snippet,
+  }))
+
+  const latestNewsAge = newsItems[0]
+    ? Math.floor((Date.now() - newsItems[0].publishedAt.getTime()) / (1000 * 60 * 60))
+    : null
+
+  return {
+    recentNews: newsItems.slice(0, 3),
+    has8K: !filingResult.error && !!filingResult.data && filingResult.data.length > 0,
+    latestNewsAge,
+  }
+}
+
+export interface InsiderSuperlatives {
+  isLargestEver: boolean
+  largestSinceDate: string | null
+  comparedToAverage: number | null
+  sameDirectionDays: number | null
+}
+
+export async function getInsiderSuperlatives(
+  insiderCik: string,
+  currentValue: number,
+  transactionType: string
+): Promise<InsiderSuperlatives | null> {
+  if (!insiderCik || !currentValue) return null
+
+  const isBuy = ['P', 'A', 'M'].includes(transactionType)
+  const types = isBuy ? ['P', 'A', 'M'] : ['S', 'D', 'F']
+
+  const { data, error } = await supabase
+    .from('insider_transactions')
+    .select('total_value, transaction_date, transaction_type')
+    .eq('insider_cik', insiderCik)
+    .in('transaction_type', types)
+    .not('total_value', 'is', null)
+    .order('transaction_date', { ascending: false })
+
+  if (error || !data || data.length === 0) return null
+
+  const absCurrentValue = Math.abs(currentValue)
+  const historicalValues = data.map(d => ({
+    value: Math.abs(d.total_value as number),
+    date: d.transaction_date as string,
+  }))
+
+  const largerTrades = historicalValues.filter(h => h.value > absCurrentValue)
+  const isLargestEver = largerTrades.length === 0
+
+  let largestSinceDate: string | null = null
+  if (!isLargestEver && largerTrades.length > 0) {
+    const mostRecentLarger = largerTrades.reduce((latest, curr) =>
+      new Date(curr.date) > new Date(latest.date) ? curr : latest
+    )
+    largestSinceDate = mostRecentLarger.date
+  }
+
+  const avgValue = historicalValues.reduce((sum, h) => sum + h.value, 0) / historicalValues.length
+  const comparedToAverage = avgValue > 0 ? absCurrentValue / avgValue : null
+
+  return {
+    isLargestEver,
+    largestSinceDate,
+    comparedToAverage,
+    sameDirectionDays: null,
+  }
+}
+
+export async function getInstitutionalContext(ticker: string): Promise<{
+  increased: number
+  decreased: number
+  newPositions: number
+  exited: number
+} | null> {
+  const activity = await getQuarterlyActivity(ticker)
+  if (!activity) return null
+
+  return {
+    increased: activity.increased,
+    decreased: activity.decreased,
+    newPositions: activity.newPositions,
+    exited: activity.exited,
+  }
 }

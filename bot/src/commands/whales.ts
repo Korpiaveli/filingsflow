@@ -26,7 +26,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   const limit = interaction.options.getInteger('limit') || 15
 
   try {
-    const { whales, activity } = await getEnhancedWhaleData(ticker, limit)
+    const { whales, activity, concentration } = await getEnhancedWhaleData(ticker, limit)
 
     if (whales.length === 0) {
       await interaction.editReply({
@@ -39,7 +39,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       return
     }
 
-    const embed = createEnhancedWhalesEmbed(ticker, whales, activity)
+    const embed = createEnhancedWhalesEmbed(ticker, whales, activity, concentration)
     await interaction.editReply({ embeds: [embed] })
   } catch (error) {
     console.error('Error fetching whale data:', error)

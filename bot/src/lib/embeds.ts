@@ -70,14 +70,31 @@ export function createTransactionEmbed(txn: TransactionResult): EmbedBuilder {
   return embed
 }
 
+export interface InsiderSuperlatives {
+  isLargestEver: boolean
+  largestSinceDate: string | null
+  comparedToAverage: number | null
+  sameDirectionDays: number | null
+}
+
+export interface InstitutionalContext {
+  increased: number
+  decreased: number
+  newPositions: number
+  exited: number
+}
+
 export function createEnhancedTransactionEmbed(
   txn: EnhancedTransactionResult,
   metrics: TransactionMetrics | null,
-  newsContext: NewsContext | null
+  newsContext: NewsContext | null,
+  superlatives?: InsiderSuperlatives | null,
+  institutionalCtx?: InstitutionalContext | null
 ): EmbedBuilder {
   const isBuy = ['P', 'A', 'M'].includes(txn.transactionType)
   const color = isBuy ? Colors.Green : Colors.Red
   const action = getTransactionAction(txn.transactionType)
+  const typeDetail = getTransactionTypeDetail(txn.transactionType)
 
   const roleLabel = txn.insiderTitle || (metrics?.isOfficer ? 'Officer' : metrics?.isDirector ? 'Director' : 'Insider')
   const recencyText = metrics?.daysSinceLastTrade != null
@@ -86,12 +103,15 @@ export function createEnhancedTransactionEmbed(
 
   const embed = new EmbedBuilder()
     .setColor(color)
-    .setTitle(`${txn.ticker} - Insider ${action}`)
+    .setTitle(`${txn.ticker} - ${typeDetail}`)
     .setDescription(`**${txn.insiderName}** (${roleLabel})${recencyText}`)
 
   const txnDetails: string[] = []
   if (txn.shares) txnDetails.push(`Shares: ${formatNumber(txn.shares)}`)
   if (txn.totalValue) txnDetails.push(`Value: ${formatCurrency(txn.totalValue)}`)
+  if (txn.directOrIndirect) {
+    txnDetails.push(txn.directOrIndirect === 'D' ? 'Direct' : 'Via Trust')
+  }
   if (metrics?.ownershipChangePercent != null && Math.abs(metrics.ownershipChangePercent) >= 5) {
     const sign = metrics.ownershipChangePercent > 0 ? '+' : ''
     txnDetails.push(`${sign}${metrics.ownershipChangePercent.toFixed(0)}% position`)
@@ -105,11 +125,28 @@ export function createEnhancedTransactionEmbed(
     })
   }
 
-  const insights = buildInsights(metrics)
+  if (metrics?.sharesOwnedAfter != null && txn.pricePerShare) {
+    const estimatedValue = metrics.sharesOwnedAfter * txn.pricePerShare
+    embed.addFields({
+      name: 'Position After',
+      value: `${formatNumber(metrics.sharesOwnedAfter)} shares (~${formatCurrency(estimatedValue)})`,
+      inline: false,
+    })
+  }
+
+  const insights = buildInsights(metrics, superlatives)
   if (insights.length > 0) {
     embed.addFields({
       name: 'Context',
       value: insights.map(i => `• ${i}`).join('\n'),
+      inline: false,
+    })
+  }
+
+  if (institutionalCtx && (institutionalCtx.increased > 0 || institutionalCtx.decreased > 0)) {
+    embed.addFields({
+      name: 'Institutions',
+      value: `${institutionalCtx.increased} increased | ${institutionalCtx.decreased} decreased this quarter`,
       inline: false,
     })
   }
@@ -167,6 +204,20 @@ export function createClusterEmbed(
     })
   }
 
+  if (cluster.totalTransactions > 0) {
+    const patternText = cluster.discretionaryCount === cluster.totalTransactions
+      ? `${cluster.discretionaryCount}/${cluster.totalTransactions} discretionary (non-10b5-1) trades`
+      : cluster.discretionaryCount === 0
+        ? `${cluster.totalTransactions}/${cluster.totalTransactions} pre-planned (10b5-1) trades`
+        : `${cluster.discretionaryCount}/${cluster.totalTransactions} discretionary trades`
+
+    embed.addFields({
+      name: 'Pattern',
+      value: patternText,
+      inline: false,
+    })
+  }
+
   embed.setFooter({ text: DISCLAIMER })
   embed.setTimestamp()
 
@@ -176,7 +227,8 @@ export function createClusterEmbed(
 export function createEnhancedWhalesEmbed(
   ticker: string,
   whales: Array<WhaleResult & { changePercent?: number | null; isNew?: boolean }>,
-  activity: QuarterlyActivity | null
+  activity: QuarterlyActivity | null,
+  concentration?: { top10Percent: number; totalInstitutionalShares: number } | null
 ): EmbedBuilder {
   const embed = new EmbedBuilder()
     .setColor(Colors.Gold)
@@ -215,6 +267,14 @@ export function createEnhancedWhalesEmbed(
         inline: false,
       })
     }
+  }
+
+  if (concentration && concentration.top10Percent > 0) {
+    embed.addFields({
+      name: 'Concentration',
+      value: `Top 10 hold ${concentration.top10Percent.toFixed(0)}% of institutional shares`,
+      inline: false,
+    })
   }
 
   const totalValue = whales.reduce((sum, w) => sum + w.valueUsd, 0)
@@ -333,10 +393,20 @@ export function createErrorEmbed(message: string): EmbedBuilder {
     .setDescription(message)
 }
 
-function buildInsights(metrics: TransactionMetrics | null): string[] {
+function buildInsights(
+  metrics: TransactionMetrics | null,
+  superlatives?: InsiderSuperlatives | null
+): string[] {
   if (!metrics) return []
 
   const insights: string[] = []
+
+  if (superlatives?.isLargestEver) {
+    insights.push('Largest transaction by this insider on record')
+  } else if (superlatives?.largestSinceDate) {
+    const year = new Date(superlatives.largestSinceDate).getFullYear()
+    insights.push(`Largest transaction by this insider since ${year}`)
+  }
 
   if (metrics.sizeMultiplier !== null && metrics.sizeMultiplier >= 2) {
     insights.push(`${metrics.sizeMultiplier.toFixed(1)}x larger than their historical average`)
@@ -344,16 +414,27 @@ function buildInsights(metrics: TransactionMetrics | null): string[] {
     insights.push(`${(1 / metrics.sizeMultiplier).toFixed(1)}x smaller than their historical average`)
   }
 
-  if (metrics.percentileRank !== null && metrics.percentileRank <= 0.05) {
-    insights.push(`Top ${(metrics.percentileRank * 100).toFixed(1)}% by value this month`)
+  if (metrics.percentileRank !== null && metrics.percentileRank <= 0.50) {
+    const pct = metrics.percentileRank * 100
+    if (pct <= 5) {
+      insights.push(`Top ${pct.toFixed(1)}% by value this month`)
+    } else if (pct <= 10) {
+      insights.push(`Top ${pct.toFixed(0)}% by value this month (notable)`)
+    } else if (pct <= 25) {
+      insights.push(`Top ${pct.toFixed(0)}% by value this month (above average)`)
+    } else {
+      insights.push(`Top ${pct.toFixed(0)}% by value this month`)
+    }
   }
 
   if (metrics.clusterInfo && metrics.clusterInfo.insiderCount >= 2) {
     insights.push(`${metrics.clusterInfo.insiderCount} insiders traded this week (${formatCurrency(metrics.clusterInfo.totalValue)} total)`)
   }
 
-  if (!metrics.is10b51Plan) {
-    insights.push('Not a 10b5-1 pre-planned trade')
+  if (metrics.is10b51Plan) {
+    insights.push('Pre-planned 10b5-1 trade')
+  } else {
+    insights.push('Discretionary trade (not pre-planned)')
   }
 
   return insights.slice(0, 4)
@@ -371,6 +452,23 @@ function getTransactionAction(code: string): string {
     C: 'Conversion',
   }
   return actions[code] || code
+}
+
+function getTransactionTypeDetail(code: string): string {
+  const details: Record<string, string> = {
+    P: 'Open Market Purchase',
+    S: 'Open Market Sale',
+    A: 'Grant/Award',
+    D: 'Disposition to Issuer',
+    M: 'Option Exercise',
+    F: 'Tax Withholding',
+    G: 'Gift',
+    C: 'Conversion',
+    I: 'Discretionary',
+    W: 'Will/Inheritance',
+    Z: 'Trust Transfer',
+  }
+  return details[code] || getTransactionAction(code)
 }
 
 function formatDate(dateStr: string): string {

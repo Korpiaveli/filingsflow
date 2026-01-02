@@ -65,6 +65,8 @@ export interface ClusterInfo {
     title: string | null
     value: number
   }>
+  discretionaryCount: number
+  totalTransactions: number
 }
 
 export interface TransactionMetrics {
@@ -99,6 +101,7 @@ export interface EnhancedTransactionResult extends TransactionResult {
   isDirector?: boolean
   is10b51Plan?: boolean
   sharesOwnedAfter?: number | null
+  directOrIndirect?: 'D' | 'I' | null
 }
 
 export interface QuarterlyActivity {

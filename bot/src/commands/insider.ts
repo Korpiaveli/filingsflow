@@ -1,8 +1,8 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js'
 import { supabase } from '../lib/supabase'
 import { createEnhancedTransactionEmbed, createTransactionEmbed, createErrorEmbed } from '../lib/embeds'
-import { calculateTransactionMetrics } from '../lib/metrics'
-import type { EnhancedTransactionResult } from '../lib/types'
+import { calculateTransactionMetrics, getNewsContext, getInsiderSuperlatives, getInstitutionalContext } from '../lib/metrics'
+import type { EnhancedTransactionResult, NewsContext } from '../lib/types'
 
 export const data = new SlashCommandBuilder()
   .setName('insider')
@@ -55,7 +55,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   let query = supabase
     .from('insider_transactions')
     .select(
-      'id, ticker, company_name, insider_name, insider_title, insider_cik, transaction_type, transaction_date, shares, price_per_share, total_value, is_officer, is_director, is_10b51_plan, shares_owned_after'
+      'id, ticker, company_name, insider_name, insider_title, insider_cik, transaction_type, transaction_date, shares, price_per_share, total_value, is_officer, is_director, is_10b51_plan, shares_owned_after, direct_or_indirect'
     )
     .order('transaction_date', { ascending: false })
     .limit(count)
@@ -108,16 +108,44 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     isDirector: t.is_director,
     is10b51Plan: t.is_10b51_plan,
     sharesOwnedAfter: t.shares_owned_after,
+    directOrIndirect: t.direct_or_indirect as 'D' | 'I' | null,
   }))
 
   let embeds
 
   if (enhanced && transactions.length <= 3) {
+    const uniqueTickers = [...new Set(transactions.map(t => t.ticker))]
+    const newsContextMap = new Map<string, NewsContext | null>()
+    const instContextMap = new Map<string, Awaited<ReturnType<typeof getInstitutionalContext>>>()
+
+    await Promise.all(
+      uniqueTickers.map(async (t) => {
+        try {
+          const [newsCtx, instCtx] = await Promise.all([
+            getNewsContext(t),
+            getInstitutionalContext(t),
+          ])
+          newsContextMap.set(t, newsCtx)
+          instContextMap.set(t, instCtx)
+        } catch {
+          newsContextMap.set(t, null)
+          instContextMap.set(t, null)
+        }
+      })
+    )
+
     embeds = await Promise.all(
       transactions.map(async (txn) => {
         try {
-          const metrics = await calculateTransactionMetrics(txn)
-          return createEnhancedTransactionEmbed(txn, metrics, null)
+          const [metrics, superlatives] = await Promise.all([
+            calculateTransactionMetrics(txn),
+            txn.insiderCik && txn.totalValue
+              ? getInsiderSuperlatives(txn.insiderCik, txn.totalValue, txn.transactionType)
+              : Promise.resolve(null),
+          ])
+          const newsCtx = newsContextMap.get(txn.ticker) ?? null
+          const instCtx = instContextMap.get(txn.ticker) ?? null
+          return createEnhancedTransactionEmbed(txn, metrics, newsCtx, superlatives, instCtx)
         } catch {
           return createTransactionEmbed(txn)
         }
