@@ -101,7 +101,7 @@ export default function HomePage() {
                 period="/month"
                 featured
                 features={[
-                  '50 watchlist tickers',
+                  '25 watchlist tickers',
                   'Real-time alerts',
                   'AI summaries',
                   'Discord notifications',
@@ -114,12 +114,12 @@ export default function HomePage() {
                 price="$79"
                 period="/month"
                 features={[
-                  'Unlimited tickers',
+                  '100 watchlist tickers',
                   'Everything in Pro',
-                  'API access',
-                  'Historical backtesting',
-                  'Fund overlap analysis',
-                  'Portfolio sync',
+                  'Priority support',
+                  'Early access to new features',
+                  'Extended data retention',
+                  'Custom alert filters',
                 ]}
               />
             </div>

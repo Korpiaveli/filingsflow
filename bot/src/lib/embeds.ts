@@ -11,7 +11,7 @@ import type {
   EnhancedTransactionResult,
 } from './types'
 
-const DISCLAIMER = 'Not investment advice. Data from SEC EDGAR.'
+const DISCLAIMER = 'Not investment advice • Data from SEC EDGAR • filingsflow.com'
 const CLUSTER_COLOR = 0xFFA500
 
 export function createFilingEmbed(filing: FilingResult): EmbedBuilder {
@@ -94,7 +94,6 @@ export function createEnhancedTransactionEmbed(
 ): EmbedBuilder {
   const isBuy = ['P', 'A', 'M'].includes(txn.transactionType)
   const color = isBuy ? Colors.Green : Colors.Red
-  const action = getTransactionAction(txn.transactionType)
   const typeDetail = getTransactionTypeDetail(txn.transactionType)
 
   const isTop1Percent = metrics?.percentileRank != null && metrics.percentileRank <= 0.01
