@@ -756,6 +756,55 @@ export const cleanupEnrichmentCache = inngest.createFunction(
   }
 )
 
+export const confirmReferrals = inngest.createFunction(
+  {
+    id: 'confirm-referrals',
+    name: 'Confirm Pending Referrals',
+    retries: 2,
+  },
+  { cron: '0 * * * *' },
+  async ({ step }) => {
+    const {
+      getPendingReferralsOver24h,
+      isValidReferral,
+      confirmReferral,
+      rejectReferral,
+      checkAndAwardMilestones,
+    } = await import('@/lib/referrals')
+
+    const pendingReferrals = await step.run('get-pending-referrals', async () => {
+      const supabase = await createServiceClient()
+      return getPendingReferralsOver24h(supabase)
+    })
+
+    if (pendingReferrals.length === 0) {
+      return { confirmed: 0, rejected: 0 }
+    }
+
+    let confirmed = 0
+    let rejected = 0
+
+    for (const referral of pendingReferrals) {
+      await step.run(`process-referral-${referral.id}`, async () => {
+        const supabase = await createServiceClient()
+
+        const validation = await isValidReferral(supabase, referral)
+
+        if (validation.valid) {
+          await confirmReferral(supabase, referral.id)
+          await checkAndAwardMilestones(supabase, referral.referrer_id)
+          confirmed++
+        } else {
+          await rejectReferral(supabase, referral.id, validation.reason || 'unknown')
+          rejected++
+        }
+      })
+    }
+
+    return { confirmed, rejected }
+  }
+)
+
 export const functions = [
   pollSECFilings,
   manualPollFilings,
@@ -765,4 +814,5 @@ export const functions = [
   poll13FFilings,
   fetchTickerNews,
   cleanupEnrichmentCache,
+  confirmReferrals,
 ]
