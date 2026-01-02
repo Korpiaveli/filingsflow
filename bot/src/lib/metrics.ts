@@ -254,20 +254,25 @@ export async function getQuarterlyActivity(ticker: string): Promise<QuarterlyAct
   }
 }
 
+export interface EnhancedWhale {
+  fundName: string | null
+  fundCik: string
+  shares: number
+  valueUsd: number
+  reportDate: string
+  previousShares: number | null
+  changePercent: number | null
+  isNew: boolean
+  portfolioPercent: number | null
+  positionRank: number | null
+  holdingStreak: number | null
+}
+
 export async function getEnhancedWhaleData(
   ticker: string,
   limit: number = 15
 ): Promise<{
-  whales: Array<{
-    fundName: string | null
-    fundCik: string
-    shares: number
-    valueUsd: number
-    reportDate: string
-    previousShares: number | null
-    changePercent: number | null
-    isNew: boolean
-  }>
+  whales: EnhancedWhale[]
   activity: QuarterlyActivity | null
   concentration: { top10Percent: number; totalInstitutionalShares: number } | null
 }> {
@@ -309,6 +314,82 @@ export async function getEnhancedWhaleData(
       .eq('report_date', currentQuarter),
   ])
 
+  const fundCiks = (currentData.data || []).map(h => h.fund_cik)
+
+  const [fundTotalsData, historicalData] = await Promise.all([
+    supabase
+      .from('holdings_13f')
+      .select('fund_cik, value_usd')
+      .in('fund_cik', fundCiks)
+      .eq('report_date', currentQuarter),
+    supabase
+      .from('holdings_13f')
+      .select('fund_cik, report_date')
+      .eq('ticker', ticker)
+      .in('fund_cik', fundCiks)
+      .order('report_date', { ascending: false }),
+  ])
+
+  const fundTotalValue = new Map<string, number>()
+  const fundPositionRanks = new Map<string, Map<string, number>>()
+
+  if (fundTotalsData.data) {
+    for (const row of fundTotalsData.data) {
+      const current = fundTotalValue.get(row.fund_cik) || 0
+      fundTotalValue.set(row.fund_cik, current + row.value_usd)
+    }
+  }
+
+  const holdingStreaks = new Map<string, number>()
+  if (historicalData.data) {
+    const fundQuarters = new Map<string, Set<string>>()
+    for (const row of historicalData.data) {
+      if (!fundQuarters.has(row.fund_cik)) {
+        fundQuarters.set(row.fund_cik, new Set())
+      }
+      fundQuarters.get(row.fund_cik)!.add(row.report_date)
+    }
+
+    for (const [fundCik, quarters] of fundQuarters) {
+      const sortedQuarters = Array.from(quarters).sort().reverse()
+      let streak = 0
+      let expectedDate = new Date(currentQuarter)
+
+      for (const quarter of sortedQuarters) {
+        const quarterDate = new Date(quarter)
+        const diffMonths = (expectedDate.getFullYear() - quarterDate.getFullYear()) * 12 +
+                          (expectedDate.getMonth() - quarterDate.getMonth())
+
+        if (diffMonths <= 4) {
+          streak++
+          expectedDate = new Date(quarter)
+          expectedDate.setMonth(expectedDate.getMonth() - 3)
+        } else {
+          break
+        }
+      }
+      holdingStreaks.set(fundCik, streak)
+    }
+  }
+
+  for (const fundCik of fundCiks) {
+    const { data: rankData } = await supabase
+      .from('holdings_13f')
+      .select('ticker, value_usd')
+      .eq('fund_cik', fundCik)
+      .eq('report_date', currentQuarter)
+      .order('value_usd', { ascending: false })
+      .limit(100)
+
+    if (rankData) {
+      const rankMap = new Map<string, number>()
+      rankData.forEach((row, index) => {
+        if (row.ticker) rankMap.set(row.ticker, index + 1)
+      })
+      fundPositionRanks.set(fundCik, rankMap)
+    }
+  }
+
   if (currentData.error) {
     return { whales: [], activity: null, concentration: null }
   }
@@ -317,7 +398,7 @@ export async function getEnhancedWhaleData(
     (prevData.data || []).map(h => [h.fund_cik, h.shares])
   )
 
-  const whales = (currentData.data || []).map(h => {
+  const whales: EnhancedWhale[] = (currentData.data || []).map(h => {
     const prevShares = prevFunds.get(h.fund_cik) ?? null
     let changePercent: number | null = null
     let isNew = false
@@ -328,6 +409,16 @@ export async function getEnhancedWhaleData(
       changePercent = ((h.shares - prevShares) / prevShares) * 100
     }
 
+    const totalValue = fundTotalValue.get(h.fund_cik)
+    const portfolioPercent = totalValue && totalValue > 0
+      ? (h.value_usd / totalValue) * 100
+      : null
+
+    const rankMap = fundPositionRanks.get(h.fund_cik)
+    const positionRank = rankMap?.get(ticker) ?? null
+
+    const holdingStreak = holdingStreaks.get(h.fund_cik) ?? null
+
     return {
       fundName: h.fund_name,
       fundCik: h.fund_cik,
@@ -337,6 +428,9 @@ export async function getEnhancedWhaleData(
       previousShares: prevShares,
       changePercent,
       isNew,
+      portfolioPercent,
+      positionRank,
+      holdingStreak,
     }
   })
 

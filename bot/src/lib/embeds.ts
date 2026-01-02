@@ -232,9 +232,22 @@ export function createClusterEmbed(
   return embed
 }
 
+interface EnhancedWhaleDisplay {
+  fundName: string | null
+  fundCik: string
+  shares: number
+  valueUsd: number
+  reportDate?: string
+  changePercent?: number | null
+  isNew?: boolean
+  portfolioPercent?: number | null
+  positionRank?: number | null
+  holdingStreak?: number | null
+}
+
 export function createEnhancedWhalesEmbed(
   ticker: string,
-  whales: Array<WhaleResult & { changePercent?: number | null; isNew?: boolean }>,
+  whales: EnhancedWhaleDisplay[],
   activity: QuarterlyActivity | null,
   concentration?: { top10Percent: number; totalInstitutionalShares: number } | null
 ): EmbedBuilder {
@@ -254,7 +267,9 @@ export function createEnhancedWhalesEmbed(
 
   const whaleList = whales.slice(0, 10).map((w, i) => {
     const change = formatChange(w.changePercent, w.isNew)
-    return `**${i + 1}.** ${w.fundName || w.fundCik} - ${formatCurrency(w.valueUsd)} ${change}`
+    const context = formatWhaleContext(w.portfolioPercent, w.positionRank, w.holdingStreak)
+    const contextStr = context ? ` (${context})` : ''
+    return `**${i + 1}.** ${w.fundName || w.fundCik} - ${formatCurrency(w.valueUsd)} ${change}${contextStr}`
   }).join('\n')
 
   embed.addFields({ name: 'Top Holders', value: whaleList, inline: false })
@@ -544,4 +559,31 @@ function formatChange(changePercent: number | null | undefined, isNew: boolean |
 function truncate(text: string, maxLength: number): string {
   if (text.length <= maxLength) return text
   return text.slice(0, maxLength - 3) + '...'
+}
+
+function formatWhaleContext(
+  portfolioPercent: number | null | undefined,
+  positionRank: number | null | undefined,
+  holdingStreak: number | null | undefined
+): string {
+  const parts: string[] = []
+
+  if (portfolioPercent != null && portfolioPercent >= 0.5) {
+    parts.push(`${portfolioPercent.toFixed(1)}% of portfolio`)
+  }
+
+  if (positionRank != null && positionRank <= 10) {
+    parts.push(`#${positionRank} position`)
+  }
+
+  if (holdingStreak != null && holdingStreak >= 4) {
+    const years = Math.floor(holdingStreak / 4)
+    if (years >= 1) {
+      parts.push(`${years}+ yr holder`)
+    } else {
+      parts.push(`${holdingStreak}Q holder`)
+    }
+  }
+
+  return parts.slice(0, 2).join(', ')
 }
