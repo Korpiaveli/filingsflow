@@ -1,14 +1,15 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { clusterPersistence } from '@/lib/clusters/persistence'
-import { performanceTracker } from '@/lib/clusters/performance-tracker'
-import type { ClusterType } from '@/lib/clusters/types'
+import type { Database } from '@/types/database'
+
+type DbClusterType = Database['public']['Tables']['cluster_definitions']['Row']['type']
+type ClusterType = DbClusterType
 
 export interface CorrelatedClusterResponse {
   id: string
   name: string
   description: string
-  type: ClusterType
+  type: DbClusterType
   correlationScore: number
   totalOccurrences: number
   avgReturn30d: number | null

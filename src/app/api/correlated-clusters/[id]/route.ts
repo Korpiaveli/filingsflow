@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 import { performanceTracker } from '@/lib/clusters/performance-tracker'
 
 export async function GET(
-  request: Request,
+  _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const supabase = await createClient()

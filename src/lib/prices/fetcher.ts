@@ -108,20 +108,20 @@ export class PriceFetcher {
         return []
       }
 
-      const startStr = startDate.toISOString().split('T')[0]
-      const endStr = endDate.toISOString().split('T')[0]
+      const startStr = startDate.toISOString().split('T')[0] ?? ''
+      const endStr = endDate.toISOString().split('T')[0] ?? ''
 
       const prices: HistoricalPrice[] = []
       for (const [date, values] of Object.entries(timeSeries)) {
-        if (date >= startStr! && date <= endStr!) {
+        if (startStr && endStr && date >= startStr && date <= endStr) {
           const v = values as Record<string, string>
           prices.push({
             date,
-            open: parseFloat(v['1. open']),
-            high: parseFloat(v['2. high']),
-            low: parseFloat(v['3. low']),
-            close: parseFloat(v['4. close']),
-            volume: parseInt(v['5. volume'], 10),
+            open: parseFloat(v['1. open'] ?? '0'),
+            high: parseFloat(v['2. high'] ?? '0'),
+            low: parseFloat(v['3. low'] ?? '0'),
+            close: parseFloat(v['4. close'] ?? '0'),
+            volume: parseInt(v['5. volume'] ?? '0', 10),
           })
         }
       }
@@ -149,13 +149,17 @@ export class PriceFetcher {
       return exactMatch.close
     }
 
+    if (prices.length === 0) {
+      return null
+    }
+
     const closestPrice = prices.reduce((closest, current) => {
       const currentDiff = Math.abs(new Date(current.date).getTime() - date.getTime())
       const closestDiff = Math.abs(new Date(closest.date).getTime() - date.getTime())
       return currentDiff < closestDiff ? current : closest
-    }, prices[0])
+    })
 
-    return closestPrice?.close || null
+    return closestPrice.close
   }
 
   calculateReturn(entryPrice: number, currentPrice: number): number {

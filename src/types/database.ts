@@ -712,6 +712,253 @@ export interface Database {
           }
         ]
       }
+      cluster_definitions: {
+        Row: {
+          id: string
+          member_fingerprint: string
+          name: string | null
+          description: string | null
+          type: 'company_insider' | 'cross_company_exec' | 'congressional' | 'institutional' | 'mixed_influential'
+          correlation_score: number
+          total_occurrences: number
+          avg_return_30d: number | null
+          avg_return_90d: number | null
+          win_rate: number | null
+          first_detected_at: string
+          last_activity_at: string
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          member_fingerprint: string
+          name?: string | null
+          description?: string | null
+          type: 'company_insider' | 'cross_company_exec' | 'congressional' | 'institutional' | 'mixed_influential'
+          correlation_score?: number
+          total_occurrences?: number
+          avg_return_30d?: number | null
+          avg_return_90d?: number | null
+          win_rate?: number | null
+          first_detected_at?: string
+          last_activity_at?: string
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          member_fingerprint?: string
+          name?: string | null
+          description?: string | null
+          type?: 'company_insider' | 'cross_company_exec' | 'congressional' | 'institutional' | 'mixed_influential'
+          correlation_score?: number
+          total_occurrences?: number
+          avg_return_30d?: number | null
+          avg_return_90d?: number | null
+          win_rate?: number | null
+          first_detected_at?: string
+          last_activity_at?: string
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      cluster_members: {
+        Row: {
+          id: string
+          cluster_id: string
+          participant_cik: string
+          participant_name: string
+          participant_type: 'officer' | 'director' | 'congress' | 'institution' | '10%_owner' | 'unknown'
+          affiliation: string | null
+          transaction_count: number
+          total_value: number
+          joined_at: string
+          last_active_at: string
+        }
+        Insert: {
+          id?: string
+          cluster_id: string
+          participant_cik: string
+          participant_name: string
+          participant_type: 'officer' | 'director' | 'congress' | 'institution' | '10%_owner' | 'unknown'
+          affiliation?: string | null
+          transaction_count?: number
+          total_value?: number
+          joined_at?: string
+          last_active_at?: string
+        }
+        Update: {
+          id?: string
+          cluster_id?: string
+          participant_cik?: string
+          participant_name?: string
+          participant_type?: 'officer' | 'director' | 'congress' | 'institution' | '10%_owner' | 'unknown'
+          affiliation?: string | null
+          transaction_count?: number
+          total_value?: number
+          joined_at?: string
+          last_active_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cluster_members_cluster_id_fkey"
+            columns: ["cluster_id"]
+            isOneToOne: false
+            referencedRelation: "cluster_definitions"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      cluster_actions: {
+        Row: {
+          id: string
+          cluster_id: string
+          ticker: string
+          company_name: string | null
+          direction: 'buy' | 'sell' | 'mixed'
+          action_date: string
+          participant_count: number
+          total_value: number
+          avg_entry_price: number | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          cluster_id: string
+          ticker: string
+          company_name?: string | null
+          direction: 'buy' | 'sell' | 'mixed'
+          action_date: string
+          participant_count: number
+          total_value: number
+          avg_entry_price?: number | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          cluster_id?: string
+          ticker?: string
+          company_name?: string | null
+          direction?: 'buy' | 'sell' | 'mixed'
+          action_date?: string
+          participant_count?: number
+          total_value?: number
+          avg_entry_price?: number | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cluster_actions_cluster_id_fkey"
+            columns: ["cluster_id"]
+            isOneToOne: false
+            referencedRelation: "cluster_definitions"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      cluster_performance: {
+        Row: {
+          id: string
+          cluster_action_id: string
+          days_since_action: number
+          current_price: number | null
+          price_change_pct: number | null
+          recorded_at: string
+        }
+        Insert: {
+          id?: string
+          cluster_action_id: string
+          days_since_action: number
+          current_price?: number | null
+          price_change_pct?: number | null
+          recorded_at?: string
+        }
+        Update: {
+          id?: string
+          cluster_action_id?: string
+          days_since_action?: number
+          current_price?: number | null
+          price_change_pct?: number | null
+          recorded_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cluster_performance_cluster_action_id_fkey"
+            columns: ["cluster_action_id"]
+            isOneToOne: false
+            referencedRelation: "cluster_actions"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      cluster_transactions: {
+        Row: {
+          id: string
+          cluster_action_id: string
+          insider_transaction_id: string | null
+          congressional_transaction_id: string | null
+          participant_cik: string
+          participant_name: string
+          transaction_type: 'buy' | 'sell'
+          value: number
+          shares: number | null
+          transaction_date: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          cluster_action_id: string
+          insider_transaction_id?: string | null
+          congressional_transaction_id?: string | null
+          participant_cik: string
+          participant_name: string
+          transaction_type: 'buy' | 'sell'
+          value: number
+          shares?: number | null
+          transaction_date: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          cluster_action_id?: string
+          insider_transaction_id?: string | null
+          congressional_transaction_id?: string | null
+          participant_cik?: string
+          participant_name?: string
+          transaction_type?: 'buy' | 'sell'
+          value?: number
+          shares?: number | null
+          transaction_date?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cluster_transactions_cluster_action_id_fkey"
+            columns: ["cluster_action_id"]
+            isOneToOne: false
+            referencedRelation: "cluster_actions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cluster_transactions_insider_transaction_id_fkey"
+            columns: ["insider_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "insider_transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cluster_transactions_congressional_transaction_id_fkey"
+            columns: ["congressional_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "congressional_transactions"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
     }
     Views: {
       [_ in never]: never
