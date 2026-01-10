@@ -11,3 +11,5 @@ export {
   getClusterTypeLabel,
   getClusterIcon,
 } from './types'
+export { clusterPersistence, ClusterPersistence } from './persistence'
+export { performanceTracker, ClusterPerformanceTracker } from './performance-tracker'
