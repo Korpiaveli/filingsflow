@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import {
   clusterDetector,
+  clusterPersistence,
   type DetectedCluster,
   type ClusterType,
 } from '@/lib/clusters'
@@ -79,6 +80,12 @@ export async function GET(request: Request) {
     [],
     { days, minParticipants, minValue }
   )
+
+  if (clusters.length > 0) {
+    clusterPersistence.processAndPersistClusters(clusters).catch(err => {
+      console.error('Failed to persist clusters:', err)
+    })
+  }
 
   if (clusterType) {
     clusters = clusters.filter(c => c.type === clusterType)

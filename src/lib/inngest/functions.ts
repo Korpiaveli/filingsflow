@@ -2,6 +2,7 @@ import { inngest } from './client'
 import { secClient, SUPPORTED_FORM_TYPES } from '@/lib/sec/client'
 import { parseForm4Xml, calculateTransactionValue } from '@/lib/sec/parsers/form4'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { performanceTracker } from '@/lib/clusters'
 import type { Tables } from '@/types/database'
 
 type FilingRow = Tables<'filings'>
@@ -387,12 +388,18 @@ export const sendWatchlistNotifications = inngest.createFunction(
         companyName: filing.company_name || ticker,
         insiderName: txn.insider_name || 'Unknown',
         insiderTitle: txn.insider_title || '',
+        insiderCik: txn.insider_cik || undefined,
+        companyCik: txn.company_cik || undefined,
+        isOfficer: txn.is_officer || false,
+        isDirector: txn.is_director || false,
+        isTenPercentOwner: txn.is_ten_percent_owner || false,
         transactionType: transactionType as 'buy' | 'sell' | 'grant',
         shares: Math.abs(txn.shares || 0),
         totalValue,
         transactionDate: txn.transaction_date || '',
         filingUrl: filing.file_url || `https://sec.gov`,
         aiSummary: filing.ai_summary || undefined,
+        is10b51Plan: txn.is_10b51_plan || false,
       }
 
       await step.run(`notify-${user.id}`, async () => {
@@ -990,6 +997,23 @@ export const pollCongressionalTrades = inngest.createFunction(
   }
 )
 
+export const updateClusterPerformance = inngest.createFunction(
+  {
+    id: 'update-cluster-performance',
+    name: 'Update Cluster Performance Metrics',
+    retries: 2,
+  },
+  { cron: '0 7 * * *' },
+  async ({ step }) => {
+    const result = await step.run('update-all-performance', async () => {
+      await performanceTracker.updateAllClusterPerformance()
+      return { success: true }
+    })
+
+    return result
+  }
+)
+
 export const functions = [
   pollSECFilings,
   manualPollFilings,
@@ -1001,4 +1025,5 @@ export const functions = [
   cleanupEnrichmentCache,
   confirmReferrals,
   pollCongressionalTrades,
+  updateClusterPerformance,
 ]

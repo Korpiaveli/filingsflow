@@ -362,6 +362,114 @@ async function seed13FHoldings(filingIds: { id: string }[]) {
   console.log(`Seeded ${holdings.length} 13F holdings`)
 }
 
+async function seedClusterData() {
+  console.log('Seeding cluster data...')
+
+  const clusterDefs = [
+    {
+      name: 'NVIDIA Leadership',
+      description: 'CEO and CFO trading in coordinated pattern',
+      type: 'company_insider' as const,
+      member_fingerprint: 'nvda_leadership_001',
+      correlation_score: 0.92,
+      total_occurrences: 5,
+      avg_return_30d: 12.5,
+      avg_return_90d: 28.3,
+      win_rate: 0.8,
+      is_active: true,
+    },
+    {
+      name: 'Tech CFO Coalition',
+      description: 'Cross-company CFO trading pattern detected',
+      type: 'cross_company_exec' as const,
+      member_fingerprint: 'tech_cfo_group_001',
+      correlation_score: 0.78,
+      total_occurrences: 3,
+      avg_return_30d: 8.2,
+      avg_return_90d: 15.7,
+      win_rate: 0.67,
+      is_active: true,
+    },
+    {
+      name: 'Bipartisan Congressional Group',
+      description: 'Members from both parties trading tech stocks',
+      type: 'congressional' as const,
+      member_fingerprint: 'congress_bipart_001',
+      correlation_score: 0.65,
+      total_occurrences: 4,
+      avg_return_30d: 5.1,
+      avg_return_90d: 11.4,
+      win_rate: 0.75,
+      is_active: true,
+    },
+    {
+      name: 'Institutional Investor Coalition',
+      description: 'Major funds coordinating on big tech positions',
+      type: 'institutional' as const,
+      member_fingerprint: 'inst_coalition_001',
+      correlation_score: 0.88,
+      total_occurrences: 6,
+      avg_return_30d: 9.8,
+      avg_return_90d: 22.1,
+      win_rate: 0.83,
+      is_active: true,
+    },
+  ]
+
+  const { data: clusters, error: clusterError } = await supabase
+    .from('cluster_definitions')
+    .upsert(clusterDefs, { onConflict: 'member_fingerprint' })
+    .select('id, name, type')
+
+  if (clusterError) {
+    console.error('Error seeding cluster definitions:', clusterError)
+    return
+  }
+
+  console.log(`Seeded ${clusters?.length || 0} cluster definitions`)
+
+  if (!clusters || clusters.length === 0) return
+
+  const nvdaCluster = clusters.find(c => c.name === 'NVIDIA Leadership')
+  if (nvdaCluster) {
+    const nvdaInsiders = getInsidersForCompany('NVDA')
+    const members = nvdaInsiders.map(insider => ({
+      cluster_id: nvdaCluster.id,
+      participant_cik: insider.cik,
+      participant_name: insider.name,
+      participant_type: insider.isOfficer ? 'officer' : 'director',
+      affiliation: COMPANIES.NVDA.company,
+      transaction_count: randomValue(3, 8),
+      total_value: randomValue(1000000, 10000000),
+    }))
+
+    await supabase.from('cluster_members').upsert(members, {
+      onConflict: 'cluster_id,participant_cik',
+    })
+
+    const actions = []
+    for (let i = 0; i < 3; i++) {
+      const actionDate = new Date()
+      actionDate.setDate(actionDate.getDate() - (i * 20 + randomValue(1, 10)))
+
+      actions.push({
+        cluster_id: nvdaCluster.id,
+        ticker: 'NVDA',
+        company_name: COMPANIES.NVDA.company,
+        direction: 'buy',
+        action_date: actionDate.toISOString().split('T')[0],
+        participant_count: 2,
+        total_value: randomValue(2000000, 15000000),
+        avg_entry_price: randomValue(120, 150),
+      })
+    }
+
+    await supabase.from('cluster_actions').insert(actions)
+  }
+
+  console.log('Seeded cluster members and actions')
+}
+
 async function main() {
   console.log('Starting seed...\n')
   console.log(`Supabase URL: ${supabaseUrl}`)
@@ -371,6 +479,7 @@ async function main() {
     await seedInsiderTransactions(filings)
     await seedCongressionalTrades()
     await seed13FHoldings(filings)
+    await seedClusterData()
 
     console.log('\nSeed completed successfully!')
     console.log('\nTest the dashboard by running: npm run dev')

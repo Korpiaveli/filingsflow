@@ -3,6 +3,8 @@ import { formatInsiderForEmail, type InsiderDisplayContext } from '@/lib/utils/f
 
 let resendInstance: Resend | null = null
 
+const EMAIL_FROM = process.env.EMAIL_FROM || 'onboarding@resend.dev'
+
 function getResend(): Resend {
   if (!resendInstance) {
     if (!process.env.RESEND_API_KEY) {
@@ -29,6 +31,7 @@ export interface InsiderAlertData {
   transactionDate: string
   filingUrl: string
   aiSummary?: string
+  is10b51Plan?: boolean
 }
 
 export interface Filing13FAlertData {
@@ -93,6 +96,12 @@ export async function sendInsiderAlert(
           </td>
         </tr>
         <tr>
+          <td style="padding: 12px; border-bottom: 1px solid #eee; color: #666;">Trade Type</td>
+          <td style="padding: 12px; border-bottom: 1px solid #eee; font-weight: 500;">
+            ${data.is10b51Plan ? '<span style="color: #666;">📋 Pre-planned (10b5-1)</span>' : '<span style="color: #0ea5e9;">⚡ Discretionary</span>'}
+          </td>
+        </tr>
+        <tr>
           <td style="padding: 12px; border-bottom: 1px solid #eee; color: #666;">Shares</td>
           <td style="padding: 12px; border-bottom: 1px solid #eee; font-weight: 500;">${formattedShares}</td>
         </tr>
@@ -126,7 +135,7 @@ export async function sendInsiderAlert(
 
   try {
     await resend.emails.send({
-      from: 'FilingsFlow <alerts@filingsflow.com>',
+      from: EMAIL_FROM,
       to,
       subject,
       html,
@@ -217,7 +226,7 @@ export async function send13FAlert(
 
   try {
     await resend.emails.send({
-      from: 'FilingsFlow <alerts@filingsflow.com>',
+      from: EMAIL_FROM,
       to,
       subject,
       html,
@@ -315,7 +324,7 @@ export async function sendDailyDigest(
 
   try {
     await resend.emails.send({
-      from: 'FilingsFlow <digest@filingsflow.com>',
+      from: EMAIL_FROM,
       to,
       subject: `FilingsFlow Daily Digest - ${data.insiderAlerts.length + data.holdings13F.length} updates`,
       html,
