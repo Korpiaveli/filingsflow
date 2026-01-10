@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { ActivityRow, ActivityRowSkeleton } from '@/components/ui/activity-row'
+import { SectionHeader } from '@/components/ui/live-indicator'
 import Link from 'next/link'
 import type { SignalType } from '@/components/ui/signal-badge'
 import { formatInsiderRelationship, type InsiderDisplayContext } from '@/lib/utils/format-insider'
@@ -101,14 +102,20 @@ export async function ActivityFeed({ userId: _userId, limit = 10 }: ActivityFeed
   const supabase = await createClient()
   const activities = await getRecentActivity(supabase, limit)
 
+  const latestActivity = activities[0]?.timestamp || null
+
   return (
     <div className="bg-card border rounded-xl p-6">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-foreground">Today&apos;s Notable Activity</h2>
-        <Link href="/activity" className="text-sm text-primary hover:underline">
-          View All →
-        </Link>
-      </div>
+      <SectionHeader
+        title="Today's Notable Activity"
+        lastUpdate={latestActivity}
+        isRealtime={true}
+        action={
+          <Link href="/activity" className="text-sm text-primary hover:underline font-medium">
+            View All →
+          </Link>
+        }
+      />
 
       {activities.length === 0 ? (
         <div className="text-center py-8">

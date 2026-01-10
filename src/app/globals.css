@@ -35,6 +35,19 @@
     --signal-sell: 0 84% 60%;
     --signal-neutral: 220 13% 46%;
 
+    /* Signal-specific semantic colors */
+    --signal-cluster: 38 92% 50%;
+    --signal-fresh: 152 76% 40%;
+    --signal-large: 271 81% 56%;
+    --signal-csuite: 217 91% 60%;
+    --signal-congress: 234 89% 60%;
+    --signal-institutional: 199 89% 48%;
+
+    /* Status indicators */
+    --status-live: 142 76% 36%;
+    --status-delayed: 220 13% 46%;
+    --status-stale: 38 92% 50%;
+
     /* Enhanced shadows for card elevation */
     --shadow-card: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.1);
     --shadow-card-hover: 0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -2px rgba(0,0,0,0.05);
@@ -78,6 +91,19 @@
     --signal-buy: 142 70% 45%;
     --signal-sell: 0 75% 55%;
     --signal-neutral: 220 15% 55%;
+
+    /* Signal-specific semantic colors (dark) */
+    --signal-cluster: 38 90% 55%;
+    --signal-fresh: 152 70% 50%;
+    --signal-large: 271 75% 65%;
+    --signal-csuite: 217 85% 65%;
+    --signal-congress: 234 85% 65%;
+    --signal-institutional: 199 85% 55%;
+
+    /* Status indicators (dark) */
+    --status-live: 142 70% 45%;
+    --status-delayed: 220 15% 55%;
+    --status-stale: 38 90% 55%;
 
     /* Enhanced shadows for dark mode */
     --shadow-card: 0 1px 3px rgba(0,0,0,0.2), 0 1px 2px rgba(0,0,0,0.3);

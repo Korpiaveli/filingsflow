@@ -1,7 +1,7 @@
 import { Suspense } from 'react'
-import { TickerSearch } from '@/components/discover/ticker-search'
 import { TrendingTickers, TrendingTickersSkeleton } from '@/components/discover/trending-tickers'
 import { AnimatedDiscover } from '@/components/discover/animated-discover'
+import { SearchCommand } from '@/components/ui/search-command'
 import Link from 'next/link'
 import { TrendingUp, Search, Target, FileText, Compass } from 'lucide-react'
 
@@ -73,15 +73,24 @@ export default async function DiscoverPage({
           )}
 
           {currentTab === 'search' && (
-            <div className="flex flex-col items-center py-16">
-              <div className="bg-gradient-to-br from-primary/10 to-primary/5 rounded-full p-6 mb-6">
-                <Search className="w-12 h-12 text-primary" />
+            <div className="flex flex-col items-center py-12">
+              <div className="bg-gradient-to-br from-primary/10 to-primary/5 rounded-full p-5 mb-6">
+                <Search className="w-10 h-10 text-primary" />
               </div>
-              <h2 className="text-2xl font-bold text-foreground mb-3">Search Any Ticker</h2>
-              <p className="text-muted-foreground mb-8 text-center max-w-md leading-relaxed">
-                Enter a ticker symbol to view all insider transactions, 13F holdings, and congressional trades
+              <h2 className="text-2xl font-bold text-foreground mb-2">Search Any Ticker</h2>
+              <p className="text-muted-foreground mb-6 text-center max-w-md leading-relaxed">
+                Find insider transactions, 13F holdings, and congressional trades
               </p>
-              <TickerSearch />
+              <div className="w-full max-w-lg">
+                <SearchCommand
+                  placeholder="Search by ticker or company name..."
+                  autoFocus
+                  className="w-full"
+                />
+                <p className="text-xs text-muted-foreground mt-3 text-center">
+                  Try searching for popular tickers like AAPL, NVDA, or TSLA
+                </p>
+              </div>
             </div>
           )}
 
