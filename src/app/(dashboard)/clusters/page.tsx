@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils/cn'
+import { CorrelatedClustersList } from '@/components/clusters/correlated-clusters-list'
 
 interface InsiderCluster {
   ticker: string
@@ -32,7 +33,10 @@ interface ClusterResponse {
   error?: string
 }
 
+type TabType = 'realtime' | 'correlated'
+
 export default function ClustersPage() {
+  const [activeTab, setActiveTab] = useState<TabType>('realtime')
   const [data, setData] = useState<ClusterResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -67,9 +71,11 @@ export default function ClustersPage() {
   }
 
   useEffect(() => {
-    fetchClusters()
+    if (activeTab === 'realtime') {
+      fetchClusters()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [activeTab])
 
   return (
     <div>
@@ -80,6 +86,81 @@ export default function ClustersPage() {
         </p>
       </div>
 
+      <div className="mb-6">
+        <div className="border-b border-gray-200">
+          <nav className="-mb-px flex gap-6">
+            <button
+              onClick={() => setActiveTab('realtime')}
+              className={cn(
+                'py-3 px-1 border-b-2 font-medium text-sm transition-colors',
+                activeTab === 'realtime'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              )}
+            >
+              Real-time Detection
+            </button>
+            <button
+              onClick={() => setActiveTab('correlated')}
+              className={cn(
+                'py-3 px-1 border-b-2 font-medium text-sm transition-colors flex items-center gap-2',
+                activeTab === 'correlated'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              )}
+            >
+              Correlated Clusters
+              <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">PRO</span>
+            </button>
+          </nav>
+        </div>
+      </div>
+
+      {activeTab === 'realtime' ? (
+        <RealtimeClusterDetection
+          data={data}
+          loading={loading}
+          error={error}
+          days={days}
+          setDays={setDays}
+          minInsiders={minInsiders}
+          setMinInsiders={setMinInsiders}
+          minValue={minValue}
+          setMinValue={setMinValue}
+          onSearch={fetchClusters}
+        />
+      ) : (
+        <CorrelatedClustersList />
+      )}
+    </div>
+  )
+}
+
+function RealtimeClusterDetection({
+  data,
+  loading,
+  error,
+  days,
+  setDays,
+  minInsiders,
+  setMinInsiders,
+  minValue,
+  setMinValue,
+  onSearch,
+}: {
+  data: ClusterResponse | null
+  loading: boolean
+  error: string | null
+  days: number
+  setDays: (v: number) => void
+  minInsiders: number
+  setMinInsiders: (v: number) => void
+  minValue: number
+  setMinValue: (v: number) => void
+  onSearch: () => void
+}) {
+  return (
+    <>
       <div className="bg-white rounded-lg border p-4 mb-6">
         <div className="flex flex-wrap gap-4 items-end">
           <div>
@@ -131,7 +212,7 @@ export default function ClustersPage() {
           </div>
 
           <button
-            onClick={fetchClusters}
+            onClick={onSearch}
             disabled={loading}
             className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
           >
@@ -185,7 +266,7 @@ export default function ClustersPage() {
           Found {data.meta.totalClusters} cluster{data.meta.totalClusters !== 1 ? 's' : ''} (showing top 20)
         </div>
       )}
-    </div>
+    </>
   )
 }
 
