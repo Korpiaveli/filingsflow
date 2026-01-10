@@ -1,9 +1,11 @@
 import { createClient } from '@/lib/supabase/server'
 import { SignalBadge } from '@/components/ui/signal-badge'
+import { Sparkline, MiniBarChart } from '@/components/ui/sparkline'
+import { LiveIndicator } from '@/components/ui/live-indicator'
 import Link from 'next/link'
-import { format, subDays } from 'date-fns'
+import { format, subDays, differenceInDays } from 'date-fns'
 import { TrendingUp, TrendingDown, AlertCircle } from 'lucide-react'
-import { AlertToggle } from './alert-toggle'
+import { AlertConfigSimple } from './alert-config'
 
 interface TickerInsightsProps {
   ticker: string
@@ -22,6 +24,8 @@ interface TickerStats {
   hasCongressTrade: boolean
   has13FActivity: boolean
   hasCluster: boolean
+  weeklyActivity: number[]
+  activityTrend: 'up' | 'down' | 'stable'
 }
 
 async function getTickerStats(
@@ -79,6 +83,24 @@ async function getTickerStats(
   const uniqueInsiders = new Set(insiders.map((t) => t.insider_name)).size
   const hasCluster = uniqueInsiders >= 3 && insiders.length >= 3
 
+  const weeklyActivity = [0, 0, 0, 0] as [number, number, number, number]
+  const now = new Date()
+  for (const txn of insiders) {
+    if (txn.transaction_date) {
+      const daysAgo = differenceInDays(now, new Date(txn.transaction_date))
+      const weekIndex = Math.min(Math.max(Math.floor(daysAgo / 7), 0), 3) as 0 | 1 | 2 | 3
+      const activityIndex = (3 - weekIndex) as 0 | 1 | 2 | 3
+      weeklyActivity[activityIndex] = weeklyActivity[activityIndex] + Math.abs(txn.total_value || 0)
+    }
+  }
+
+  const recentWeeks = weeklyActivity.slice(-2)
+  const olderWeeks = weeklyActivity.slice(0, 2)
+  const recentAvg = recentWeeks.reduce((a, b) => a + b, 0) / 2
+  const olderAvg = olderWeeks.reduce((a, b) => a + b, 0) / 2
+  const activityTrend: 'up' | 'down' | 'stable' =
+    recentAvg > olderAvg * 1.2 ? 'up' : recentAvg < olderAvg * 0.8 ? 'down' : 'stable'
+
   return {
     insiderBuys30d: buys,
     insiderSells30d: sells,
@@ -89,6 +111,8 @@ async function getTickerStats(
     hasCongressTrade: (congressData.data?.length || 0) > 0,
     has13FActivity: (holdingsData.data?.length || 0) > 0,
     hasCluster,
+    weeklyActivity,
+    activityTrend,
   }
 }
 
@@ -135,10 +159,20 @@ export async function TickerInsights({ ticker, companyName, watchlistId, alertsE
   const config = activityConfig[activityLevel]
   const ActivityIcon = config.icon
 
+  const freshness = stats.lastInsiderDate
+    ? differenceInDays(new Date(), stats.lastInsiderDate) < 1
+      ? 'live'
+      : differenceInDays(new Date(), stats.lastInsiderDate) < 7
+        ? 'delayed'
+        : 'stale'
+    : 'stale'
+
+  const hasSparklineData = stats.weeklyActivity.some(v => v > 0)
+
   return (
     <div className="bg-card border rounded-xl p-5 hover:shadow-lg hover:border-primary/30 transition-all duration-200">
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex-1">
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <Link
               href={`/activity?ticker=${ticker}`}
@@ -147,19 +181,49 @@ export async function TickerInsights({ ticker, companyName, watchlistId, alertsE
               {ticker}
             </Link>
             {stats.hasCluster && <span className="text-sm">🔥</span>}
+            {stats.activityTrend === 'up' && (
+              <span className="text-xs text-[hsl(var(--signal-buy))]">▲</span>
+            )}
+            {stats.activityTrend === 'down' && (
+              <span className="text-xs text-[hsl(var(--signal-sell))]">▼</span>
+            )}
           </div>
           {companyName && (
             <p className="text-sm text-muted-foreground line-clamp-1">{companyName}</p>
           )}
         </div>
+        {hasSparklineData && (
+          <div className="flex-shrink-0 ml-3">
+            <Sparkline
+              data={stats.weeklyActivity}
+              width={64}
+              height={28}
+              color={stats.netFlow30d >= 0 ? 'buy' : 'sell'}
+              showDots
+            />
+          </div>
+        )}
       </div>
 
-      <div className="mb-4">
+      <div className="flex items-center gap-2 mb-4">
         <span
-          className={`inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full font-semibold ${config.color}`}
+          className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-semibold ${config.color}`}
         >
           {ActivityIcon && <ActivityIcon className="w-3 h-3" />}
           {config.label}
+        </span>
+        <LiveIndicator status={freshness} showLabel={false} />
+      </div>
+
+      <div className="flex items-center gap-3 mb-4">
+        <MiniBarChart
+          buyValue={stats.insiderBuys30d}
+          sellValue={stats.insiderSells30d}
+          width={80}
+          height={8}
+        />
+        <span className="text-xs text-muted-foreground">
+          {stats.insiderBuys30d}B / {stats.insiderSells30d}S
         </span>
       </div>
 
@@ -225,7 +289,7 @@ export async function TickerInsights({ ticker, companyName, watchlistId, alertsE
       )}
 
       {watchlistId && (
-        <AlertToggle watchlistId={watchlistId} ticker={ticker} initialEnabled={alertsEnabled} />
+        <AlertConfigSimple watchlistId={watchlistId} ticker={ticker} initialEnabled={alertsEnabled} />
       )}
     </div>
   )
