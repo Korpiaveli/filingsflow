@@ -6,6 +6,7 @@ import type { Tables } from '@/types/database'
 import { MobileNav } from '@/components/layout/mobile-nav'
 import { DesktopNav } from '@/components/layout/desktop-nav'
 import { OnboardingModal } from '@/components/onboarding/onboarding-modal'
+import { SkipLink } from '@/components/ui/accessible-components'
 import { LayoutDashboard, Activity, Compass, Star } from 'lucide-react'
 
 export default async function DashboardLayout({
@@ -41,7 +42,8 @@ export default async function DashboardLayout({
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-0">
-      <header className="bg-card/95 backdrop-blur-sm border-b sticky top-0 z-50">
+      <SkipLink href="#main-content" />
+      <header className="bg-card/95 backdrop-blur-sm border-b sticky top-0 z-50" role="banner">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-8">
@@ -74,11 +76,11 @@ export default async function DashboardLayout({
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8">
+      <main id="main-content" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8" role="main">
         {children}
       </main>
 
-      <footer className="hidden md:block border-t bg-card mt-auto">
+      <footer className="hidden md:block border-t bg-card mt-auto" role="contentinfo">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <p className="text-xs text-muted-foreground text-center">{DISCLAIMER_SHORT}</p>
         </div>
