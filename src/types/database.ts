@@ -427,6 +427,291 @@ export interface Database {
         }
         Relationships: []
       }
+      congressional_transactions: {
+        Row: {
+          id: string
+          member_name: string
+          chamber: 'house' | 'senate'
+          party: string | null
+          state: string | null
+          district: string | null
+          ticker: string | null
+          asset_description: string | null
+          asset_type: string | null
+          transaction_type: string
+          transaction_date: string | null
+          disclosure_date: string
+          amount_range: string
+          amount_low: number | null
+          amount_high: number | null
+          owner: string | null
+          ptr_link: string | null
+          comment: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          member_name: string
+          chamber: 'house' | 'senate'
+          party?: string | null
+          state?: string | null
+          district?: string | null
+          ticker?: string | null
+          asset_description?: string | null
+          asset_type?: string | null
+          transaction_type: string
+          transaction_date?: string | null
+          disclosure_date: string
+          amount_range: string
+          amount_low?: number | null
+          amount_high?: number | null
+          owner?: string | null
+          ptr_link?: string | null
+          comment?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          member_name?: string
+          chamber?: 'house' | 'senate'
+          party?: string | null
+          state?: string | null
+          district?: string | null
+          ticker?: string | null
+          asset_description?: string | null
+          asset_type?: string | null
+          transaction_type?: string
+          transaction_date?: string | null
+          disclosure_date?: string
+          amount_range?: string
+          amount_low?: number | null
+          amount_high?: number | null
+          owner?: string | null
+          ptr_link?: string | null
+          comment?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      congressional_sync_log: {
+        Row: {
+          id: string
+          chamber: 'house' | 'senate'
+          status: 'running' | 'completed' | 'failed'
+          started_at: string
+          completed_at: string | null
+          records_fetched: number | null
+          records_inserted: number | null
+          error_message: string | null
+        }
+        Insert: {
+          id?: string
+          chamber: 'house' | 'senate'
+          status: 'running' | 'completed' | 'failed'
+          started_at?: string
+          completed_at?: string | null
+          records_fetched?: number | null
+          records_inserted?: number | null
+          error_message?: string | null
+        }
+        Update: {
+          id?: string
+          chamber?: 'house' | 'senate'
+          status?: 'running' | 'completed' | 'failed'
+          started_at?: string
+          completed_at?: string | null
+          records_fetched?: number | null
+          records_inserted?: number | null
+          error_message?: string | null
+        }
+        Relationships: []
+      }
+      news_cache: {
+        Row: {
+          id: string
+          ticker: string
+          source: 'yahoo' | 'google' | 'sec_8k'
+          title: string
+          url: string
+          published_at: string
+          snippet: string | null
+          fetched_at: string
+          expires_at: string
+        }
+        Insert: {
+          id?: string
+          ticker: string
+          source: 'yahoo' | 'google' | 'sec_8k'
+          title: string
+          url: string
+          published_at: string
+          snippet?: string | null
+          fetched_at?: string
+          expires_at?: string
+        }
+        Update: {
+          id?: string
+          ticker?: string
+          source?: 'yahoo' | 'google' | 'sec_8k'
+          title?: string
+          url?: string
+          published_at?: string
+          snippet?: string | null
+          fetched_at?: string
+          expires_at?: string
+        }
+        Relationships: []
+      }
+      referral_codes: {
+        Row: {
+          id: string
+          user_id: string
+          code: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          code: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          code?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referral_codes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      referrals: {
+        Row: {
+          id: string
+          referrer_id: string
+          referred_id: string
+          code_used: string
+          status: 'pending' | 'confirmed' | 'rejected'
+          rejection_reason: string | null
+          signup_ip: string | null
+          created_at: string
+          confirmed_at: string | null
+        }
+        Insert: {
+          id?: string
+          referrer_id: string
+          referred_id: string
+          code_used: string
+          status?: 'pending' | 'confirmed' | 'rejected'
+          rejection_reason?: string | null
+          signup_ip?: string | null
+          created_at?: string
+          confirmed_at?: string | null
+        }
+        Update: {
+          id?: string
+          referrer_id?: string
+          referred_id?: string
+          code_used?: string
+          status?: 'pending' | 'confirmed' | 'rejected'
+          rejection_reason?: string | null
+          signup_ip?: string | null
+          created_at?: string
+          confirmed_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referrals_referrer_id_fkey"
+            columns: ["referrer_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referrals_referred_id_fkey"
+            columns: ["referred_id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      referral_credits: {
+        Row: {
+          id: string
+          user_id: string
+          milestone: number
+          amount_cents: number
+          stripe_txn_id: string | null
+          awarded_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          milestone: number
+          amount_cents: number
+          stripe_txn_id?: string | null
+          awarded_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          milestone?: number
+          amount_cents?: number
+          stripe_txn_id?: string | null
+          awarded_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referral_credits_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      referral_audit_log: {
+        Row: {
+          id: string
+          event_type: string
+          user_id: string | null
+          details: unknown | null
+          ip_address: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          event_type: string
+          user_id?: string | null
+          details?: unknown | null
+          ip_address?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          event_type?: string
+          user_id?: string | null
+          details?: unknown | null
+          ip_address?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referral_audit_log_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -439,6 +724,96 @@ export interface Database {
       can_add_to_watchlist: {
         Args: { p_user_id: string }
         Returns: boolean
+      }
+      get_top_signal: {
+        Args: { p_user_id?: string }
+        Returns: {
+          ticker: string
+          company_name: string
+          signal_type: string
+          headline: string
+          context: string
+          value: number
+          direction: string
+          insider_name: string
+          insider_title: string
+          transaction_date: string
+          filing_id: string
+          significance_score: number
+          is_cluster: boolean
+          cluster_count: number
+          is_first_in_months: boolean
+          months_since_last: number
+        }[]
+      }
+      get_watchlist_pulse: {
+        Args: { p_user_id: string }
+        Returns: {
+          ticker: string
+          company_name: string
+          insider_buys_30d: number
+          insider_sells_30d: number
+          net_flow_30d: number
+          last_insider_date: string | null
+          last_insider_name: string | null
+          last_insider_action: string | null
+          has_cluster: boolean
+          has_congress_trade: boolean
+          has_13f_activity: boolean
+          activity_level: string
+        }[]
+      }
+      get_trending_tickers: {
+        Args: { p_limit?: number }
+        Returns: {
+          ticker: string
+          company_name: string
+          transaction_count: number
+          unique_insiders: number
+          total_buy_value: number
+          total_sell_value: number
+          net_flow: number
+          has_cluster: boolean
+          top_insider_name: string | null
+          top_insider_title: string | null
+        }[]
+      }
+      get_unified_activity: {
+        Args: {
+          p_user_id?: string
+          p_source?: string
+          p_direction?: string
+          p_min_value?: number
+          p_watchlist_only?: boolean
+          p_ticker?: string
+          p_limit?: number
+          p_offset?: number
+        }
+        Returns: {
+          id: string
+          source: string
+          ticker: string
+          company_name: string
+          headline: string
+          subtext: string
+          value: number
+          direction: string
+          event_date: string
+          signals: unknown
+        }[]
+      }
+      cleanup_expired_news_cache: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      get_referral_stats: {
+        Args: { p_user_id: string }
+        Returns: {
+          total_referrals: number
+          confirmed_referrals: number
+          pending_referrals: number
+          credits_earned_cents: number
+        }[]
       }
     }
     Enums: {

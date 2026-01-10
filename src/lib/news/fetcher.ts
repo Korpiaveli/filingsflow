@@ -1,10 +1,9 @@
-import { createClient } from '@supabase/supabase-js'
+import { createAdminClient } from '@/lib/supabase/admin'
 import type { NewsItem, NewsContext } from './types'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
-
-const supabase = createClient(supabaseUrl, supabaseKey)
+function getSupabase() {
+  return createAdminClient()
+}
 
 const USER_AGENT = 'FilingsFlow/1.0 (RSS Reader)'
 const CACHE_HOURS = 1
@@ -45,6 +44,7 @@ export async function getNewsContext(ticker: string): Promise<NewsContext> {
 }
 
 async function getCachedNews(ticker: string): Promise<NewsItem[]> {
+  const supabase = getSupabase()
   const cacheThreshold = new Date()
   cacheThreshold.setHours(cacheThreshold.getHours() - CACHE_HOURS)
 
@@ -186,6 +186,7 @@ function truncate(text: string, maxLength: number): string {
 }
 
 async function cacheNews(ticker: string, news: NewsItem[]): Promise<void> {
+  const supabase = getSupabase()
   const rows = news.map(item => ({
     ticker: ticker.toUpperCase(),
     source: item.source,
@@ -201,6 +202,7 @@ async function cacheNews(ticker: string, news: NewsItem[]): Promise<void> {
 }
 
 async function check8KFilings(ticker: string): Promise<boolean> {
+  const supabase = getSupabase()
   const weekAgo = new Date()
   weekAgo.setDate(weekAgo.getDate() - 7)
 
@@ -227,6 +229,7 @@ export async function fetchNewsForTickers(tickers: string[]): Promise<void> {
 }
 
 export async function cleanupExpiredCache(): Promise<number> {
+  const supabase = getSupabase()
   const { data, error } = await supabase.rpc('cleanup_expired_news_cache')
   if (error) {
     console.error('Failed to cleanup news cache:', error)

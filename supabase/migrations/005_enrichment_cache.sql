@@ -3,7 +3,7 @@
 
 -- News cache for RSS fetched items
 CREATE TABLE IF NOT EXISTS public.news_cache (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   ticker TEXT NOT NULL,
   source TEXT NOT NULL CHECK (source IN ('yahoo', 'google', 'sec_8k')),
   title TEXT NOT NULL,

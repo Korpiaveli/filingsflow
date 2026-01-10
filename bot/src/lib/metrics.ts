@@ -3,6 +3,8 @@ import type { TransactionMetrics, ClusterInfo, EnhancedTransactionResult, Quarte
 
 const CLUSTER_DAYS = 7
 const PERCENTILE_DAYS = 30
+const CLUSTER_MIN_VALUE = 100_000
+const CLUSTER_MIN_INSIDERS = 2
 
 export async function calculateTransactionMetrics(
   txn: EnhancedTransactionResult
@@ -154,13 +156,15 @@ async function getClusterInfo(
     }
   }
 
-  if (uniqueInsiders.size < 2) return null
+  if (uniqueInsiders.size < CLUSTER_MIN_INSIDERS) return null
 
   const participants = Array.from(uniqueInsiders.values())
     .sort((a, b) => b.value - a.value)
     .slice(0, 5)
 
   const totalValue = participants.reduce((sum, p) => sum + p.value, 0)
+
+  if (totalValue < CLUSTER_MIN_VALUE) return null
 
   return {
     insiderCount: uniqueInsiders.size,

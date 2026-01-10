@@ -6,6 +6,7 @@ export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
   const redirect = searchParams.get('redirect') || '/filings'
+  const ref = searchParams.get('ref')
   const errorDescription = searchParams.get('error_description')
 
   if (errorDescription) {
@@ -36,6 +37,18 @@ export async function GET(request: Request) {
           .from('users')
           .update(updateData)
           .eq('id', user.id)
+      }
+
+      if (ref && user) {
+        try {
+          await fetch(`${origin}/api/referrals/track`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code: ref, userId: user.id }),
+          })
+        } catch {
+          // Referral tracking failure shouldn't block auth
+        }
       }
 
       return NextResponse.redirect(`${origin}${redirect}`)

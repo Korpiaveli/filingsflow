@@ -11,7 +11,7 @@ import type {
   EnhancedTransactionResult,
 } from './types'
 
-const DISCLAIMER = 'Not investment advice • Data from SEC EDGAR • filingsflow.com'
+const DISCLAIMER = 'Not investment advice • /invite to add FilingsFlow • filingsflow.com'
 const CLUSTER_COLOR = 0xFFA500
 
 export function createFilingEmbed(filing: FilingResult): EmbedBuilder {

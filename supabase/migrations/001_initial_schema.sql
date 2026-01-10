@@ -1,8 +1,8 @@
 -- FilingsFlow Initial Schema
 -- Based on PRD requirements
 
--- Enable required extensions
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+-- Enable required extensions (use extensions schema for Supabase)
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA extensions;
 
 -- Users table (extends Supabase auth.users)
 CREATE TABLE public.users (
@@ -22,7 +22,7 @@ CREATE TABLE public.users (
 
 -- Watchlists (tickers user wants to track)
 CREATE TABLE public.watchlists (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   ticker TEXT NOT NULL,
   company_name TEXT,
@@ -35,7 +35,7 @@ CREATE TABLE public.watchlists (
 
 -- Tracked Funds (institutional investors user follows)
 CREATE TABLE public.tracked_funds (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   cik TEXT NOT NULL,
   fund_name TEXT NOT NULL,
@@ -45,7 +45,7 @@ CREATE TABLE public.tracked_funds (
 
 -- SEC Filings (denormalized for performance)
 CREATE TABLE public.filings (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   cik TEXT NOT NULL,
   accession_number TEXT UNIQUE NOT NULL,
   form_type TEXT NOT NULL,
@@ -65,7 +65,7 @@ CREATE TABLE public.filings (
 
 -- Insider Transactions (parsed from Form 3/4/5)
 CREATE TABLE public.insider_transactions (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   filing_id UUID NOT NULL REFERENCES public.filings(id) ON DELETE CASCADE,
   ticker TEXT NOT NULL,
   company_cik TEXT NOT NULL,
@@ -92,7 +92,7 @@ CREATE TABLE public.insider_transactions (
 
 -- 13F Holdings (institutional fund positions)
 CREATE TABLE public.holdings_13f (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   filing_id UUID NOT NULL REFERENCES public.filings(id) ON DELETE CASCADE,
   fund_cik TEXT NOT NULL,
   fund_name TEXT,
@@ -113,7 +113,7 @@ CREATE TABLE public.holdings_13f (
 
 -- Discord Servers (for bot licensing)
 CREATE TABLE public.discord_servers (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   guild_id TEXT UNIQUE NOT NULL,
   guild_name TEXT,
   owner_user_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
@@ -128,7 +128,7 @@ CREATE TABLE public.discord_servers (
 
 -- Server Watchlists (for Discord bot)
 CREATE TABLE public.server_watchlists (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   server_id UUID NOT NULL REFERENCES public.discord_servers(id) ON DELETE CASCADE,
   ticker TEXT NOT NULL,
   added_by_user_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
@@ -138,7 +138,7 @@ CREATE TABLE public.server_watchlists (
 
 -- User Notification Preferences
 CREATE TABLE public.notification_preferences (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID UNIQUE NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   email_enabled BOOLEAN NOT NULL DEFAULT TRUE,
   email_frequency TEXT NOT NULL DEFAULT 'realtime' CHECK (email_frequency IN ('realtime', 'daily', 'weekly', 'never')),
@@ -152,7 +152,7 @@ CREATE TABLE public.notification_preferences (
 
 -- Notification History
 CREATE TABLE public.notifications (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   filing_id UUID REFERENCES public.filings(id) ON DELETE SET NULL,
   notification_type TEXT NOT NULL CHECK (notification_type IN ('filing', 'insider_cluster', 'fund_update', 'digest')),

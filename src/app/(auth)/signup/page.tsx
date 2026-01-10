@@ -2,21 +2,37 @@
 
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
-import { useState } from 'react'
+import { useState, useEffect, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 
-export default function SignupPage() {
+function SignupForm() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [referralCode, setReferralCode] = useState<string | null>(null)
+  const searchParams = useSearchParams()
+
+  useEffect(() => {
+    const ref = searchParams.get('ref')
+    if (ref) {
+      setReferralCode(ref)
+      sessionStorage.setItem('referral_code', ref)
+    }
+  }, [searchParams])
 
   const handleDiscordSignup = async () => {
     setIsLoading(true)
     setError(null)
 
+    const ref = referralCode || sessionStorage.getItem('referral_code')
+    const redirectUrl = ref
+      ? `${window.location.origin}/callback?redirect=/filings&ref=${ref}`
+      : `${window.location.origin}/callback?redirect=/filings`
+
     const supabase = createClient()
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'discord',
       options: {
-        redirectTo: `${window.location.origin}/callback?redirect=/filings`,
+        redirectTo: redirectUrl,
         scopes: 'identify email',
       },
     })
@@ -87,5 +103,31 @@ export default function SignupPage() {
         </p>
       </div>
     </div>
+  )
+}
+
+function SignupFormFallback() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="max-w-md w-full px-6">
+        <div className="text-center mb-8">
+          <div className="text-2xl font-bold text-primary">FilingsFlow</div>
+          <div className="mt-6 h-9 w-48 mx-auto bg-gray-200 rounded animate-pulse" />
+          <div className="mt-2 h-5 w-64 mx-auto bg-gray-100 rounded animate-pulse" />
+        </div>
+        <div className="bg-white rounded-lg shadow-sm border p-8">
+          <div className="h-32 bg-gray-100 rounded-md animate-pulse mb-6" />
+          <div className="h-12 bg-gray-200 rounded-md animate-pulse" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense fallback={<SignupFormFallback />}>
+      <SignupForm />
+    </Suspense>
   )
 }

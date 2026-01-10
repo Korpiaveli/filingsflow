@@ -1,17 +1,17 @@
 -- Server watchlists for Discord bot
-CREATE TABLE IF NOT EXISTS server_watchlists (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    guild_id TEXT NOT NULL,
-    ticker TEXT NOT NULL,
-    added_by TEXT,
-    alert_channel_id TEXT,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
+-- NOTE: server_watchlists already created in 001_initial_schema with different columns
+-- This migration adds the simplified guild-based version for the Discord bot
 
-    UNIQUE(guild_id, ticker)
-);
+-- Add guild_id column if it doesn't exist (for bot-based lookups)
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'server_watchlists' AND column_name = 'guild_id') THEN
+    ALTER TABLE server_watchlists ADD COLUMN guild_id TEXT;
+  END IF;
+END $$;
 
-CREATE INDEX idx_server_watchlists_guild ON server_watchlists(guild_id);
-CREATE INDEX idx_server_watchlists_ticker ON server_watchlists(ticker);
+CREATE INDEX IF NOT EXISTS idx_server_watchlists_guild ON server_watchlists(guild_id);
+CREATE INDEX IF NOT EXISTS idx_server_watchlists_ticker ON server_watchlists(ticker);
 
 -- Discord server settings
 CREATE TABLE IF NOT EXISTS server_settings (

@@ -2,7 +2,9 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { NotificationSettings } from '@/components/settings/notification-settings'
 import { SubscriptionCard } from '@/components/settings/subscription-card'
+import { ReferralCard } from '@/components/settings/referral-card'
 import { SignOutButton } from '@/components/settings/sign-out-button'
+import { getReferralStats } from '@/lib/referrals'
 import type { Tables } from '@/types/database'
 
 type User = Tables<'users'>
@@ -29,6 +31,8 @@ export default async function SettingsPage() {
     .select('*')
     .eq('user_id', user.id)
     .single()
+
+  const referralStats = await getReferralStats(supabase, user.id)
 
   const userProfile = profile as User | null
   const prefs = notificationPrefs as NotificationPrefs | null
@@ -69,6 +73,8 @@ export default async function SettingsPage() {
         />
 
         <NotificationSettings prefs={prefs} />
+
+        {referralStats && <ReferralCard stats={referralStats} />}
 
         <section className="bg-white rounded-lg border p-6">
           <h2 className="text-lg font-semibold mb-4">Danger Zone</h2>

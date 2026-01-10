@@ -1,4 +1,5 @@
 import { Resend } from 'resend'
+import { formatInsiderForEmail, type InsiderDisplayContext } from '@/lib/utils/format-insider'
 
 let resendInstance: Resend | null = null
 
@@ -17,6 +18,11 @@ export interface InsiderAlertData {
   companyName: string
   insiderName: string
   insiderTitle: string
+  insiderCik?: string
+  companyCik?: string
+  isOfficer?: boolean
+  isDirector?: boolean
+  isTenPercentOwner?: boolean
   transactionType: 'buy' | 'sell' | 'grant'
   shares: number
   totalValue: number
@@ -48,6 +54,20 @@ export async function sendInsiderAlert(
 
   const formattedShares = new Intl.NumberFormat('en-US').format(data.shares)
 
+  const insiderContext: InsiderDisplayContext = {
+    insiderName: data.insiderName,
+    insiderTitle: data.insiderTitle || null,
+    insiderCik: data.insiderCik || '',
+    companyCik: data.companyCik || '',
+    companyName: data.companyName,
+    ticker: data.ticker,
+    isOfficer: data.isOfficer || false,
+    isDirector: data.isDirector || false,
+    isTenPercentOwner: data.isTenPercentOwner || false,
+  }
+
+  const formattedInsider = formatInsiderForEmail(insiderContext)
+
   const subject = `${data.transactionType === 'buy' ? '🟢' : data.transactionType === 'sell' ? '🔴' : '🟡'} ${data.ticker}: ${data.insiderName} ${data.transactionType} ${formattedValue}`
 
   const html = `
@@ -61,7 +81,7 @@ export async function sendInsiderAlert(
           ${data.ticker} - ${data.companyName}
         </p>
         <p style="margin: 0; color: #666;">
-          ${data.insiderName} (${data.insiderTitle})
+          ${formattedInsider.displayName}, ${formattedInsider.roleDescription} ${formattedInsider.companyContext}
         </p>
       </div>
 

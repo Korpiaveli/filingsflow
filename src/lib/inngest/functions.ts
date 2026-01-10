@@ -1,7 +1,7 @@
 import { inngest } from './client'
 import { secClient, SUPPORTED_FORM_TYPES } from '@/lib/sec/client'
 import { parseForm4Xml, calculateTransactionValue } from '@/lib/sec/parsers/form4'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import type { Tables } from '@/types/database'
 
 type FilingRow = Tables<'filings'>
@@ -65,7 +65,7 @@ export const pollSECFilings = inngest.createFunction(
     const typedFilings = filings as SerializedFiling[]
 
     const newFilings = await step.run('filter-new-filings', async (): Promise<SerializedFiling[]> => {
-      const supabase = await createServiceClient()
+      const supabase = createAdminClient()
 
       const accessionNumbers = typedFilings.map((f) => f.accessionNumber)
 
@@ -86,7 +86,7 @@ export const pollSECFilings = inngest.createFunction(
     }
 
     const insertedFilings = await step.run('insert-filings', async (): Promise<FilingRow[]> => {
-      const supabase = await createServiceClient()
+      const supabase = createAdminClient()
 
       const filingsToInsert = typedNewFilings.map((f) => ({
         cik: f.cik,
@@ -114,7 +114,7 @@ export const pollSECFilings = inngest.createFunction(
     const typedInsertedFilings = insertedFilings as FilingRow[]
 
     const processedTransactions = await step.run('process-form4s', async () => {
-      const supabase = await createServiceClient()
+      const supabase = createAdminClient()
       let totalTransactions = 0
 
       const form4Filings = typedInsertedFilings.filter(
@@ -243,7 +243,7 @@ export const generateAISummaries = inngest.createFunction(
     const { generateFilingSummary } = await import('@/lib/ai/summarize')
 
     const filingsToSummarize = await step.run('fetch-unsummarized', async () => {
-      const supabase = await createServiceClient()
+      const supabase = createAdminClient()
 
       const { data } = await supabase
         .from('filings')
@@ -267,7 +267,7 @@ export const generateAISummaries = inngest.createFunction(
 
     for (const filing of filingsToSummarize) {
       await step.run(`summarize-${filing.id}`, async () => {
-        const supabase = await createServiceClient()
+        const supabase = createAdminClient()
 
         const summary = await generateFilingSummary(filing as FilingRow & { insider_transactions: Tables<'insider_transactions'>[] })
 
@@ -308,7 +308,7 @@ export const sendWatchlistNotifications = inngest.createFunction(
     }
 
     const watchlistUsers = await step.run('get-watchlist-users', async () => {
-      const supabase = await createServiceClient()
+      const supabase = createAdminClient()
 
       const { data } = await supabase
         .from('watchlists')
@@ -338,7 +338,7 @@ export const sendWatchlistNotifications = inngest.createFunction(
     }
 
     const filing = await step.run('get-filing-data', async () => {
-      const supabase = await createServiceClient()
+      const supabase = createAdminClient()
 
       const { data } = await supabase
         .from('filings')
@@ -439,7 +439,7 @@ export const sendDailyDigest = inngest.createFunction(
     const { sendDailyDigest: sendDigestEmail } = await import('@/lib/notifications/email')
 
     const usersToNotify = await step.run('get-daily-digest-users', async () => {
-      const supabase = await createServiceClient()
+      const supabase = createAdminClient()
 
       const { data } = await supabase
         .from('users')
@@ -479,7 +479,7 @@ export const sendDailyDigest = inngest.createFunction(
       const minValue = prefs?.min_transaction_value ?? 0
 
       await step.run(`digest-${user.id}`, async () => {
-        const supabase = await createServiceClient()
+        const supabase = createAdminClient()
 
         const { data: transactions } = await supabase
           .from('insider_transactions')
@@ -568,7 +568,7 @@ export const poll13FFilings = inngest.createFunction(
     })
 
     const newFilings = await step.run('filter-new-13f', async () => {
-      const supabase = await createServiceClient()
+      const supabase = createAdminClient()
 
       const accessionNumbers = filings.map((f) => f.accessionNumber)
 
@@ -587,7 +587,7 @@ export const poll13FFilings = inngest.createFunction(
     }
 
     const insertedFilings = await step.run('insert-13f-filings', async () => {
-      const supabase = await createServiceClient()
+      const supabase = createAdminClient()
 
       const filingsToInsert = newFilings.map((f) => ({
         cik: f.cik,
@@ -616,7 +616,7 @@ export const poll13FFilings = inngest.createFunction(
 
     for (const filing of insertedFilings) {
       await step.run(`process-13f-${filing.id}`, async () => {
-        const supabase = await createServiceClient()
+        const supabase = createAdminClient()
 
         try {
           const xml = await secClient.fetch13FXml(filing.cik, filing.accession_number)
@@ -698,7 +698,7 @@ export const fetchTickerNews = inngest.createFunction(
     const { fetchNewsForTickers } = await import('@/lib/news')
 
     const activeTickers = await step.run('get-active-tickers', async () => {
-      const supabase = await createServiceClient()
+      const supabase = createAdminClient()
 
       const oneDayAgo = new Date()
       oneDayAgo.setDate(oneDayAgo.getDate() - 1)
@@ -773,7 +773,7 @@ export const confirmReferrals = inngest.createFunction(
     } = await import('@/lib/referrals')
 
     const pendingReferrals = await step.run('get-pending-referrals', async () => {
-      const supabase = await createServiceClient()
+      const supabase = createAdminClient()
       return getPendingReferralsOver24h(supabase)
     })
 
@@ -786,7 +786,7 @@ export const confirmReferrals = inngest.createFunction(
 
     for (const referral of pendingReferrals) {
       await step.run(`process-referral-${referral.id}`, async () => {
-        const supabase = await createServiceClient()
+        const supabase = createAdminClient()
 
         const validation = await isValidReferral(supabase, referral)
 
@@ -805,6 +805,191 @@ export const confirmReferrals = inngest.createFunction(
   }
 )
 
+interface CongressionalTransaction {
+  disclosure_date: string
+  disclosure_year: number
+  transaction_date: string
+  owner: string
+  ticker: string | null
+  asset_description: string
+  asset_type: string
+  type: string
+  amount: string
+  comment?: string
+  representative?: string
+  district?: string
+  ptr_link?: string
+  senator?: string
+  first_name?: string
+  last_name?: string
+  office?: string
+}
+
+function parseAmountRange(amount: string): { low: number; high: number } {
+  const ranges: Record<string, { low: number; high: number }> = {
+    '$1,001 - $15,000': { low: 1001, high: 15000 },
+    '$15,001 - $50,000': { low: 15001, high: 50000 },
+    '$50,001 - $100,000': { low: 50001, high: 100000 },
+    '$100,001 - $250,000': { low: 100001, high: 250000 },
+    '$250,001 - $500,000': { low: 250001, high: 500000 },
+    '$500,001 - $1,000,000': { low: 500001, high: 1000000 },
+    '$1,000,001 - $5,000,000': { low: 1000001, high: 5000000 },
+    '$5,000,001 - $25,000,000': { low: 5000001, high: 25000000 },
+    '$25,000,001 - $50,000,000': { low: 25000001, high: 50000000 },
+    'Over $50,000,000': { low: 50000001, high: 100000000 },
+  }
+  return ranges[amount] || { low: 0, high: 0 }
+}
+
+export const pollCongressionalTrades = inngest.createFunction(
+  {
+    id: 'poll-congressional-trades',
+    name: 'Poll Congressional Stock Trades',
+    retries: 3,
+  },
+  { cron: '0 6 * * *' },
+  async ({ step }) => {
+    const supabase = createAdminClient()
+
+    const logEntry = await step.run('create-sync-log', async () => {
+      const { data } = await supabase
+        .from('congressional_sync_log')
+        .insert({ chamber: 'house', status: 'running' })
+        .select()
+        .single()
+      return data
+    })
+
+    const houseData = await step.run('fetch-house-data', async () => {
+      try {
+        const response = await fetch(
+          'https://house-stock-watcher-data.s3-us-west-2.amazonaws.com/data/all_transactions.json',
+          { headers: { 'User-Agent': 'FilingsFlow/1.0' } }
+        )
+        if (!response.ok) return []
+        return (await response.json()) as CongressionalTransaction[]
+      } catch (error) {
+        console.error('Failed to fetch House data:', error)
+        return []
+      }
+    })
+
+    const senateData = await step.run('fetch-senate-data', async () => {
+      try {
+        const response = await fetch(
+          'https://senate-stock-watcher-data.s3-us-west-2.amazonaws.com/aggregate/all_transactions.json',
+          { headers: { 'User-Agent': 'FilingsFlow/1.0' } }
+        )
+        if (!response.ok) return []
+        return (await response.json()) as CongressionalTransaction[]
+      } catch (error) {
+        console.error('Failed to fetch Senate data:', error)
+        return []
+      }
+    })
+
+    const thirtyDaysAgo = new Date()
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+
+    const recentHouse = houseData.filter(t => {
+      const date = new Date(t.disclosure_date)
+      return date >= thirtyDaysAgo
+    })
+
+    const recentSenate = senateData.filter(t => {
+      const date = new Date(t.disclosure_date)
+      return date >= thirtyDaysAgo
+    })
+
+    const insertedHouse = await step.run('upsert-house-trades', async () => {
+      if (recentHouse.length === 0) return 0
+
+      const records = recentHouse.map(t => {
+        const { low, high } = parseAmountRange(t.amount)
+        return {
+          chamber: 'house' as const,
+          member_name: t.representative || 'Unknown',
+          state: t.district?.split('-')[0] || null,
+          district: t.district || null,
+          party: null,
+          ticker: t.ticker === '--' ? null : t.ticker,
+          asset_description: t.asset_description,
+          asset_type: t.asset_type,
+          transaction_type: t.type,
+          transaction_date: t.transaction_date ? new Date(t.transaction_date).toISOString().split('T')[0] : null,
+          disclosure_date: new Date(t.disclosure_date).toISOString().split('T')[0] as string,
+          amount_range: t.amount,
+          amount_low: low,
+          amount_high: high,
+          owner: t.owner,
+          ptr_link: t.ptr_link || null,
+          comment: t.comment || null,
+        }
+      })
+
+      const { error } = await supabase
+        .from('congressional_transactions')
+        .upsert(records, { onConflict: 'chamber,member_name,disclosure_date,ticker,transaction_date,transaction_type,amount_range' })
+
+      if (error) console.error('House upsert error:', error)
+      return records.length
+    })
+
+    const insertedSenate = await step.run('upsert-senate-trades', async () => {
+      if (recentSenate.length === 0) return 0
+
+      const records = recentSenate.map(t => {
+        const { low, high } = parseAmountRange(t.amount)
+        const memberName = t.senator || `${t.first_name || ''} ${t.last_name || ''}`.trim() || 'Unknown'
+        return {
+          chamber: 'senate' as const,
+          member_name: memberName,
+          state: t.office || null,
+          district: null,
+          party: null,
+          ticker: t.ticker === '--' ? null : t.ticker,
+          asset_description: t.asset_description,
+          asset_type: t.asset_type,
+          transaction_type: t.type,
+          transaction_date: t.transaction_date ? new Date(t.transaction_date).toISOString().split('T')[0] : null,
+          disclosure_date: new Date(t.disclosure_date).toISOString().split('T')[0] as string,
+          amount_range: t.amount,
+          amount_low: low,
+          amount_high: high,
+          owner: t.owner,
+          ptr_link: t.ptr_link || null,
+          comment: t.comment || null,
+        }
+      })
+
+      const { error } = await supabase
+        .from('congressional_transactions')
+        .upsert(records, { onConflict: 'chamber,member_name,disclosure_date,ticker,transaction_date,transaction_type,amount_range' })
+
+      if (error) console.error('Senate upsert error:', error)
+      return records.length
+    })
+
+    await step.run('update-sync-log', async () => {
+      if (!logEntry?.id) return
+      await supabase
+        .from('congressional_sync_log')
+        .update({
+          status: 'completed',
+          completed_at: new Date().toISOString(),
+          records_fetched: houseData.length + senateData.length,
+          records_inserted: insertedHouse + insertedSenate,
+        })
+        .eq('id', logEntry.id)
+    })
+
+    return {
+      house: { fetched: houseData.length, recent: recentHouse.length, inserted: insertedHouse },
+      senate: { fetched: senateData.length, recent: recentSenate.length, inserted: insertedSenate },
+    }
+  }
+)
+
 export const functions = [
   pollSECFilings,
   manualPollFilings,
@@ -815,4 +1000,5 @@ export const functions = [
   fetchTickerNews,
   cleanupEnrichmentCache,
   confirmReferrals,
+  pollCongressionalTrades,
 ]

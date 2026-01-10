@@ -3,7 +3,7 @@
 
 -- Referral codes (one per user)
 CREATE TABLE public.referral_codes (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID UNIQUE NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   code TEXT UNIQUE NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -11,7 +11,7 @@ CREATE TABLE public.referral_codes (
 
 -- Referral tracking
 CREATE TABLE public.referrals (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   referrer_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   referred_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   code_used TEXT NOT NULL,
@@ -25,7 +25,7 @@ CREATE TABLE public.referrals (
 
 -- Credit awards history
 CREATE TABLE public.referral_credits (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   milestone INTEGER NOT NULL,
   amount_cents INTEGER NOT NULL,
@@ -36,7 +36,7 @@ CREATE TABLE public.referral_credits (
 
 -- Audit log for fraud detection
 CREATE TABLE public.referral_audit_log (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   event_type TEXT NOT NULL,
   user_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
   details JSONB,
